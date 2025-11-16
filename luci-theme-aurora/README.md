@@ -45,7 +45,7 @@ Aurora uses **Vite** as the build tool.
 
 ## License & Credits
 
-The project structure for the production build is based on the official OpenWrt theme.  
+The project structure for the production build is based on the official OpenWrt theme  
 [luci-theme-bootstrap](https://github.com/openwrt/luci/tree/master/themes/luci-theme-bootstrap).
 
 Visual style and some implementations are influenced by  
