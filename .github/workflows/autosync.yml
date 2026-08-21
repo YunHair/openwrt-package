@@ -155,8 +155,8 @@ jobs:
           CHANGED_FILES=$(git diff --staged --name-only | wc -l)
           COMMIT_MSG="$COMMIT_MSG
 
-Changed files: $CHANGED_FILES"
-          
+          Changed files: $CHANGED_FILES"
+               
           echo "Committing $CHANGED_FILES files..."
           git commit -m "$COMMIT_MSG"
           
