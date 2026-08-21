@@ -1,0 +1,103 @@
+name: Sync openwrt-package
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  multi-sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Sync multiple sources
+      run: |
+        # 定义同步任务 - 支持更复杂的映射关系
+        # 格式: "source_repo|branch|type|source_dirs|target_base"
+        # 对于dir类型，source_dirs可以是：
+        #   - 单个目录: "gecoosac" -> 同步到 "gecoosac"
+        #   - 多个目录: "gecoosac luci-app-gecoosac luci-app-wolultra" -> 分别同步到同名目录
+        #   - 映射关系: "gecoosac:my-gecoosac luci-app-gecoosac:custom-gecoosac" -> 同步到指定名称
+        # 对于full类型，source_dirs留空，target_base指定目标目录
+        
+        SYNC_TASKS=(
+          # 从同一仓库同步多个目录到同名目录
+          "https://github.com/VIKINGYFY/packages|main|dir|gecoosac luci-app-gecoosac luci-app-wolultra|"
+          
+          # 从同一仓库同步多个目录到自定义目录名
+          # "https://github.com/VIKINGYFY/packages|main|dir|gecoosac:my-gecoosac luci-app-gecoosac:custom-gecoosac|"
+          
+          # 整仓库同步
+          "https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
+          "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
+        )
+        
+        # 处理同步任务
+        for task in "${SYNC_TASKS[@]}"; do
+          IFS='|' read -r REPO BRANCH TYPE SOURCE_DIRS TARGET_BASE <<< "$task"
+          
+          echo "=== Processing: $REPO ==="
+          
+          # 克隆仓库
+          TEMP_DIR="temp_$(echo $REPO | md5sum | cut -c1-8)"
+          git clone --depth 1 --single-branch --branch $BRANCH $REPO $TEMP_DIR || continue
+          
+          case $TYPE in
+            "dir")
+              # 处理多个目录
+              for item in $SOURCE_DIRS; do
+                # 检查是否包含映射关系 (source:target)
+                if [[ $item == *":"* ]]; then
+                  SOURCE_PATH="${item%:*}"
+                  TARGET_PATH="${item#*:}"
+                else
+                  SOURCE_PATH="$item"
+                  TARGET_PATH="$item"
+                fi
+                
+                # 如果指定了TARGET_BASE，则在基础目录下创建
+                if [ -n "$TARGET_BASE" ]; then
+                  TARGET_PATH="$TARGET_BASE/$TARGET_PATH"
+                fi
+                
+                if [ -d "$TEMP_DIR/$SOURCE_PATH" ]; then
+                  mkdir -p "$TARGET_PATH"
+                  rsync -av --delete "$TEMP_DIR/$SOURCE_PATH/" "$TARGET_PATH/" > /dev/null 2>&1
+                  echo "  ✓ Synced: $SOURCE_PATH -> $TARGET_PATH"
+                else
+                  echo "  ✗ Source not found: $SOURCE_PATH"
+                fi
+              done
+              ;;
+            
+            "full")
+              TARGET_PATH="$TARGET_BASE"
+              mkdir -p "$TARGET_PATH"
+              rsync -av --delete --exclude='.git' "$TEMP_DIR/" "$TARGET_PATH/" > /dev/null 2>&1
+              echo "  ✓ Synced full repo to: $TARGET_PATH"
+              ;;
+          esac
+          
+          rm -rf "$TEMP_DIR"
+          echo ""
+        done
+    
+    - name: Commit and push
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git add -A
+        if ! git diff --staged --quiet; then
+          git commit -m "Auto sync - $(date '+%Y-%m-%d %H:%M:%S')"
+          git push
+          echo "✓ Changes pushed"
+        else
+          echo "No changes to commit"
+        fi
