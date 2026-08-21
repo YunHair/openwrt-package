@@ -1,4 +1,4 @@
-name: Sync openwrt-package
+name: Sync 
 
 on:
   schedule:
@@ -6,98 +6,162 @@ on:
   workflow_dispatch:
 
 jobs:
-  multi-sync:
+  sync:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # 使用个人令牌
         fetch-depth: 0
     
-    - name: Sync multiple sources
+    - name: Install rsync
       run: |
-        # 定义同步任务 - 支持更复杂的映射关系
-        # 格式: "source_repo|branch|type|source_dirs|target_base"
-        # 对于dir类型，source_dirs可以是：
-        #   - 单个目录: "gecoosac" -> 同步到 "gecoosac"
-        #   - 多个目录: "gecoosac luci-app-gecoosac luci-app-wolultra" -> 分别同步到同名目录
-        #   - 映射关系: "gecoosac:my-gecoosac luci-app-gecoosac:custom-gecoosac" -> 同步到指定名称
-        # 对于full类型，source_dirs留空，target_base指定目标目录
+        sudo apt-get update
+        sudo apt-get install -y rsync
+    
+    - name: Sync repositories
+      run: |
+        #!/bin/bash
         
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        RED='\033[0;31m'
+        BLUE='\033[0;34m'
+        NC='\033[0m'
+        
+        echo -e "${BLUE}========================================${NC}"
+        echo -e "${BLUE}    Multi-Source Sync Started${NC}"
+        echo -e "${BLUE}========================================${NC}"
+        
+        # 配置 Git 用户
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # 定义同步任务
         SYNC_TASKS=(
-          # 从同一仓库同步多个目录到同名目录
           "https://github.com/VIKINGYFY/packages|main|dir|gecoosac luci-app-gecoosac luci-app-wolultra|"
-          
-          # 从同一仓库同步多个目录到自定义目录名
-          # "https://github.com/VIKINGYFY/packages|main|dir|gecoosac:my-gecoosac luci-app-gecoosac:custom-gecoosac|"
-          
-          # 整仓库同步
           "https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
         )
         
-        # 处理同步任务
+        # 创建临时目录
+        mkdir -p temp_sync
+        
+        # 处理每个同步任务
         for task in "${SYNC_TASKS[@]}"; do
           IFS='|' read -r REPO BRANCH TYPE SOURCE_DIRS TARGET_BASE <<< "$task"
           
-          echo "=== Processing: $REPO ==="
+          echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+          echo -e "Processing: ${BLUE}$REPO${NC} (type: $TYPE)"
+          echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+          
+          # 生成临时目录名
+          TEMP_DIR="temp_sync/$(echo $REPO | md5sum | cut -c1-8)"
           
           # 克隆仓库
-          TEMP_DIR="temp_$(echo $REPO | md5sum | cut -c1-8)"
-          git clone --depth 1 --single-branch --branch $BRANCH $REPO $TEMP_DIR || continue
+          echo "📦 Cloning repository..."
+          if git clone --depth 1 --single-branch --branch $BRANCH $REPO $TEMP_DIR 2>/dev/null; then
+            echo -e "${GREEN}✓ Clone successful${NC}"
+          else
+            echo -e "${RED}✗ Clone failed, skipping...${NC}"
+            continue
+          fi
           
           case $TYPE in
             "dir")
               # 处理多个目录
-              for item in $SOURCE_DIRS; do
-                # 检查是否包含映射关系 (source:target)
-                if [[ $item == *":"* ]]; then
-                  SOURCE_PATH="${item%:*}"
-                  TARGET_PATH="${item#*:}"
+              IFS=' ' read -ra DIRS <<< "$SOURCE_DIRS"
+              
+              for SOURCE_PATH in "${DIRS[@]}"; do
+                [ -z "$SOURCE_PATH" ] && continue
+                
+                # 检查是否包含映射
+                if [[ $SOURCE_PATH == *":"* ]]; then
+                  SRC="${SOURCE_PATH%:*}"
+                  TGT="${SOURCE_PATH#*:}"
                 else
-                  SOURCE_PATH="$item"
-                  TARGET_PATH="$item"
+                  SRC="$SOURCE_PATH"
+                  TGT="$SOURCE_PATH"
                 fi
                 
-                # 如果指定了TARGET_BASE，则在基础目录下创建
+                # 构建目标路径
                 if [ -n "$TARGET_BASE" ]; then
-                  TARGET_PATH="$TARGET_BASE/$TARGET_PATH"
+                  TARGET_PATH="$TARGET_BASE/$TGT"
+                else
+                  TARGET_PATH="$TGT"
                 fi
                 
-                if [ -d "$TEMP_DIR/$SOURCE_PATH" ]; then
+                echo -e "  📁 Syncing: $SRC -> $TARGET_PATH"
+                
+                if [ -d "$TEMP_DIR/$SRC" ]; then
                   mkdir -p "$TARGET_PATH"
-                  rsync -av --delete "$TEMP_DIR/$SOURCE_PATH/" "$TARGET_PATH/" > /dev/null 2>&1
-                  echo "  ✓ Synced: $SOURCE_PATH -> $TARGET_PATH"
+                  rsync -av --delete "$TEMP_DIR/$SRC/" "$TARGET_PATH/" > /dev/null 2>&1
+                  FILE_COUNT=$(find "$TARGET_PATH" -type f 2>/dev/null | wc -l)
+                  echo -e "  ${GREEN}✓ Synced! Files: $FILE_COUNT${NC}"
                 else
-                  echo "  ✗ Source not found: $SOURCE_PATH"
+                  echo -e "  ${RED}✗ Source not found: $SRC${NC}"
                 fi
               done
               ;;
             
             "full")
               TARGET_PATH="$TARGET_BASE"
-              mkdir -p "$TARGET_PATH"
-              rsync -av --delete --exclude='.git' "$TEMP_DIR/" "$TARGET_PATH/" > /dev/null 2>&1
-              echo "  ✓ Synced full repo to: $TARGET_PATH"
+              echo -e "  📦 Syncing full repository to: $TARGET_PATH"
+              
+              if [ -d "$TEMP_DIR" ]; then
+                mkdir -p "$TARGET_PATH"
+                rsync -av --delete --exclude='.git' "$TEMP_DIR/" "$TARGET_PATH/" > /dev/null 2>&1
+                FILE_COUNT=$(find "$TARGET_PATH" -type f 2>/dev/null | wc -l)
+                echo -e "  ${GREEN}✓ Full repo synced! Files: $FILE_COUNT${NC}"
+              else
+                echo -e "  ${RED}✗ Source repository not found${NC}"
+              fi
               ;;
           esac
           
+          # 清理
           rm -rf "$TEMP_DIR"
-          echo ""
         done
+        
+        # 清理临时目录
+        rm -rf temp_sync
+        
+        echo -e "\n${GREEN}Sync completed!${NC}"
     
-    - name: Commit and push
+    - name: Commit and push changes
       run: |
+        # 配置 Git
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
+        # 设置远程URL（使用个人令牌）
+        REMOTE_URL="https://YunHair:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/YunHair/openwrt-package.git"
+        git remote set-url origin $REMOTE_URL
+        
+        # 添加所有更改
         git add -A
-        if ! git diff --staged --quiet; then
-          git commit -m "Auto sync - $(date '+%Y-%m-%d %H:%M:%S')"
-          git push
-          echo "✓ Changes pushed"
-        else
+        
+        # 检查是否有变更
+        if git diff --staged --quiet; then
           echo "No changes to commit"
+        else
+          # 生成提交信息
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+          COMMIT_MSG="Auto sync from multiple sources - $TIMESTAMP"
+          
+          # 添加更改统计
+          CHANGED_FILES=$(git diff --staged --name-only | wc -l)
+          COMMIT_MSG="$COMMIT_MSG
+
+Changed files: $CHANGED_FILES"
+          
+          echo "Committing $CHANGED_FILES files..."
+          git commit -m "$COMMIT_MSG"
+          
+          echo "Pushing to remote..."
+          git push
+          
+          echo "✓ Changes pushed successfully"
         fi
