@@ -1,4 +1,4 @@
-name: Sync 
+name: Sync
 
 on:
   schedule:
@@ -12,7 +12,7 @@ jobs:
       - name: Delete old Releases and Workflows
         uses: ophub/delete-releases-workflows@main
         with:
-          gh_token: ${{secrets.PERSONAL_ACCESS_TOKEN}}
+          gh_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           delete_releases: true
           releases_keep_latest: 0
           delete_tags: true
@@ -26,13 +26,21 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # 使用个人令牌
+        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         fetch-depth: 0
     
-    - name: Install rsync
+    - name: Install rsync and git tools
       run: |
         sudo apt-get update
         sudo apt-get install -y rsync
+    
+    - name: Configure Git for public repos
+      run: |
+        # 配置 Git 使用 HTTPS 而不是 SSH
+        git config --global url."https://github.com/".insteadOf git@github.com:
+        # 设置用户信息
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
     
     - name: Sync repositories
       run: |
@@ -47,10 +55,6 @@ jobs:
         echo -e "${BLUE}========================================${NC}"
         echo -e "${BLUE}    Multi-Source Sync Started${NC}"
         echo -e "${BLUE}========================================${NC}"
-        
-        # 配置 Git 用户
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
         
         # 定义同步任务
         SYNC_TASKS=(
@@ -74,13 +78,30 @@ jobs:
           # 生成临时目录名
           TEMP_DIR="temp_sync/$(echo $REPO | md5sum | cut -c1-8)"
           
-          # 克隆仓库
+          # 克隆仓库 - 改进的克隆方法
           echo "📦 Cloning repository..."
-          if git clone --depth 1 --single-branch --branch $BRANCH $REPO $TEMP_DIR 2>/dev/null; then
+          
+          # 方法1: 直接克隆（使用配置的全局设置）
+          if git clone --depth 1 --single-branch --branch $BRANCH $REPO $TEMP_DIR 2>&1; then
             echo -e "${GREEN}✓ Clone successful${NC}"
           else
-            echo -e "${RED}✗ Clone failed, skipping...${NC}"
-            continue
+            # 方法2: 如果失败，尝试使用 PAT 认证（即使是公开仓库）
+            echo "  Trying with PAT authentication..."
+            REPO_NAME=$(basename $REPO .git)
+            AUTH_REPO="https://YunHair:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/NilsRo/${REPO_NAME}.git"
+            
+            if git clone --depth 1 --single-branch --branch $BRANCH $AUTH_REPO $TEMP_DIR 2>&1; then
+              echo -e "${GREEN}✓ Clone successful with PAT${NC}"
+            else
+              # 方法3: 尝试不带分支指定
+              echo "  Trying without branch specification..."
+              if git clone --depth 1 $REPO $TEMP_DIR 2>&1; then
+                echo -e "${GREEN}✓ Clone successful (no branch)${NC}"
+              else
+                echo -e "${RED}✗ Clone failed, skipping...${NC}"
+                continue
+              fi
+            fi
           fi
           
           case $TYPE in
@@ -116,6 +137,8 @@ jobs:
                   echo -e "  ${GREEN}✓ Synced! Files: $FILE_COUNT${NC}"
                 else
                   echo -e "  ${RED}✗ Source not found: $SRC${NC}"
+                  echo -e "  Available directories:"
+                  ls -d $TEMP_DIR/*/ 2>/dev/null | head -5
                 fi
               done
               ;;
@@ -170,7 +193,7 @@ jobs:
           COMMIT_MSG="$COMMIT_MSG
 
           Changed files: $CHANGED_FILES"
-               
+          
           echo "Committing $CHANGED_FILES files..."
           git commit -m "$COMMIT_MSG"
           
