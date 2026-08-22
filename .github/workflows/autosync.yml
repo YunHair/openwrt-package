@@ -61,7 +61,7 @@ jobs:
           "https://github.com/VIKINGYFY/packages|main|dir|gecoosac luci-app-gecoosac luci-app-wolultra|"
           "https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
-          "https://github.com/NilsRo/usteer-ng|main|full||usteer-ng"
+          "https://github.com/NilsRo/usteer-ng|development|full||usteer-ng"
         )
         
         # 创建临时目录
