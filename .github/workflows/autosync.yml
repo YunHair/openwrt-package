@@ -54,60 +54,157 @@ jobs:
         echo -e "${BLUE}    Multi-Source Sync Started${NC}"
         echo -e "${BLUE}========================================${NC}"
         
-        # 定义同步任务
-        # 格式: "source_repo|branch|type|source_path|target_path"
-        # type: "dir" 表示目录克隆, "full" 表示整仓库克隆
-        # 对于 usteer-ng，使用 "dir" 类型并指定子目录路径
+        # ============================================
+        # 同步任务配置
+        # ============================================
+        # 格式: "source_repo|branch|sync_mode|source_path|target_path"
+        #
+        # sync_mode 类型:
+        #   - full: 同步整个仓库（source_path 留空）
+        #   - dir: 同步指定目录（source_path 可以是单个目录）
+        #   - dirs: 同步多个目录（source_path 用空格分隔）
+        #   - subdir: 同步子目录内容到目标目录（source_path 为子目录路径）
+        #   - subdirs: 同步多个子目录（source_path 用空格分隔）
+        #
+        # source_path: 源仓库中的路径
+        #   - 对于 subdir: "openwrt/usteer-ng" 
+        #   - 对于 dirs: "gecoosac luci-app-gecoosac luci-app-wolultra"
+        #   - 对于 full: 留空 ""
+        #
+        # target_path: 目标仓库中的路径
+        #   - 对于 dirs: 目标基础目录
+        #   - 对于 subdir: 目标目录
+        #   - 对于 full: 目标目录
+        # ============================================
+        
         SYNC_TASKS=(
-          # 普通的整仓库同步
+          # 示例1: 同步多个目录（从同一仓库）
+          "https://github.com/VIKINGYFY/packages|main|dirs|gecoosac luci-app-gecoosac luci-app-wolultra|"
+          
+          # 示例2: 同步子目录内容到目标目录（适用于 Makefile 在子目录的情况）
+          "https://github.com/NilsRo/usteer-ng|development|subdir|openwrt/usteer-ng|usteer-ng"
+          
+          # 示例3: 同步整个仓库
           "https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
+          
+          # 示例4: 同步整个仓库
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
           
-          # 从 VIKINGYFY/packages 同步多个目录
-          "https://github.com/VIKINGYFY/packages|main|dir|gecoosac luci-app-gecoosac luci-app-wolultra|"
+          # ============================================
+          # 更多示例（注释掉，需要时取消注释）
+          # ============================================
           
-          # usteer-ng: 同步子目录 openwrt/usteer-ng 到 usteer-ng
-          "https://github.com/NilsRo/usteer-ng|development|dir|openwrt/usteer-ng|usteer-ng"
+          # 示例5: 同步单个子目录
+          # "https://github.com/example/repo|main|subdir|path/to/subdir|custom-target"
+          
+          # 示例6: 同步多个子目录到不同目标
+          # "https://github.com/example/repo|main|subdirs|subdir1:target1 subdir2:target2 subdir3:target3|"
+          
+          # 示例7: 同步单个目录（非子目录）
+          # "https://github.com/example/repo|main|dir|some-dir|my-dir"
         )
         
-        mkdir -p temp_sync
+        # ============================================
+        # 同步处理函数
+        # ============================================
         
-        for task in "${SYNC_TASKS[@]}"; do
-          IFS='|' read -r REPO BRANCH TYPE SOURCE_DIRS TARGET_BASE <<< "$task"
-          
-          echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-          echo -e "Processing: ${BLUE}$REPO${NC} (type: $TYPE)"
-          echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-          
-          TEMP_DIR="temp_sync/$(echo $REPO | md5sum | cut -c1-8)"
+        # 函数: 克隆仓库
+        clone_repo() {
+          local REPO=$1
+          local BRANCH=$2
+          local TEMP_DIR=$3
           
           echo "📦 Cloning repository..."
           
-          # 尝试克隆
+          # 尝试直接克隆
           if git clone --depth 1 --single-branch --branch $BRANCH $REPO $TEMP_DIR 2>&1; then
             echo -e "${GREEN}✓ Clone successful${NC}"
+            return 0
           else
+            # 尝试使用 PAT
             echo "  Trying with PAT authentication..."
             REPO_NAME=$(basename $REPO .git)
-            AUTH_REPO="https://YunHair:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/NilsRo/${REPO_NAME}.git"
+            AUTH_REPO="https://YunHair:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${REPO_NAME}.git"
             
             if git clone --depth 1 --single-branch --branch $BRANCH $AUTH_REPO $TEMP_DIR 2>&1; then
               echo -e "${GREEN}✓ Clone successful with PAT${NC}"
+              return 0
             else
-              echo -e "${RED}✗ Clone failed, skipping...${NC}"
-              continue
+              echo -e "${RED}✗ Clone failed${NC}"
+              return 1
             fi
           fi
+        }
+        
+        # 函数: 同步目录
+        sync_directory() {
+          local SRC=$1
+          local TGT=$2
+          local TEMP_DIR=$3
           
-          case $TYPE in
+          echo -e "  📁 Syncing: $SRC -> $TGT"
+          
+          if [ -d "$TEMP_DIR/$SRC" ]; then
+            mkdir -p "$TGT"
+            rsync -av --delete "$TEMP_DIR/$SRC/" "$TGT/" > /dev/null 2>&1
+            FILE_COUNT=$(find "$TGT" -type f 2>/dev/null | wc -l)
+            echo -e "  ${GREEN}✓ Synced! Files: $FILE_COUNT${NC}"
+            return 0
+          else
+            echo -e "  ${RED}✗ Source not found: $SRC${NC}"
+            return 1
+          fi
+        }
+        
+        # ============================================
+        # 主处理循环
+        # ============================================
+        
+        mkdir -p temp_sync
+        FAILED_TASKS=()
+        
+        for task in "${SYNC_TASKS[@]}"; do
+          IFS='|' read -r REPO BRANCH SYNC_MODE SOURCE_PATHS TARGET_PATH <<< "$task"
+          
+          echo -e "\n${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+          echo -e "Repository: ${BLUE}$REPO${NC}"
+          echo -e "Mode: ${BLUE}$SYNC_MODE${NC}"
+          echo -e "Source: $SOURCE_PATHS"
+          echo -e "Target: $TARGET_PATH"
+          echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+          
+          # 生成临时目录名
+          TEMP_DIR="temp_sync/$(echo $REPO | md5sum | cut -c1-8)"
+          
+          # 克隆仓库
+          if ! clone_repo "$REPO" "$BRANCH" "$TEMP_DIR"; then
+            FAILED_TASKS+=("$REPO")
+            continue
+          fi
+          
+          # 根据模式执行同步
+          case $SYNC_MODE in
+            "full")
+              # 同步整个仓库
+              echo -e "  📦 Syncing full repository to: $TARGET_PATH"
+              mkdir -p "$TARGET_PATH"
+              rsync -av --delete --exclude='.git' "$TEMP_DIR/" "$TARGET_PATH/" > /dev/null 2>&1
+              FILE_COUNT=$(find "$TARGET_PATH" -type f 2>/dev/null | wc -l)
+              echo -e "  ${GREEN}✓ Full repo synced! Files: $FILE_COUNT${NC}"
+              ;;
+            
             "dir")
-              # 处理多个目录
-              IFS=' ' read -ra DIRS <<< "$SOURCE_DIRS"
-              
+              # 同步单个目录
+              sync_directory "$SOURCE_PATHS" "$TARGET_PATH" "$TEMP_DIR"
+              ;;
+            
+            "dirs")
+              # 同步多个目录到同一基础目录
+              IFS=' ' read -ra DIRS <<< "$SOURCE_PATHS"
               for SOURCE_PATH in "${DIRS[@]}"; do
                 [ -z "$SOURCE_PATH" ] && continue
                 
-                # 检查是否包含映射
+                # 检查是否包含映射 (source:target)
                 if [[ $SOURCE_PATH == *":"* ]]; then
                   SRC="${SOURCE_PATH%:*}"
                   TGT="${SOURCE_PATH#*:}"
@@ -117,83 +214,122 @@ jobs:
                 fi
                 
                 # 构建目标路径
-                if [ -n "$TARGET_BASE" ]; then
-                  TARGET_PATH="$TARGET_BASE/$TGT"
+                if [ -n "$TARGET_PATH" ]; then
+                  FINAL_TARGET="$TARGET_PATH/$TGT"
                 else
-                  TARGET_PATH="$TGT"
+                  FINAL_TARGET="$TGT"
                 fi
                 
-                echo -e "  📁 Syncing: $SRC -> $TARGET_PATH"
-                
-                if [ -d "$TEMP_DIR/$SRC" ]; then
-                  mkdir -p "$TARGET_PATH"
-                  rsync -av --delete "$TEMP_DIR/$SRC/" "$TARGET_PATH/" > /dev/null 2>&1
-                  FILE_COUNT=$(find "$TARGET_PATH" -type f 2>/dev/null | wc -l)
-                  echo -e "  ${GREEN}✓ Synced! Files: $FILE_COUNT${NC}"
-                  
-                  # 如果是 usteer-ng，显示修复信息
-                  if [[ "$TARGET_PATH" == "usteer-ng" ]]; then
-                    echo -e "  ℹ️  usteer-ng synced from subdirectory: openwrt/usteer-ng"
-                  fi
-                else
-                  echo -e "  ${RED}✗ Source not found: $SRC${NC}"
-                  
-                  # 显示可用目录帮助调试
-                  if [[ "$REPO" == *"usteer-ng"* ]]; then
-                    echo -e "  Available directories in repo:"
-                    find "$TEMP_DIR" -type d -name "usteer-ng" 2>/dev/null | head -5
-                    echo -e "  Full directory structure (first 3 levels):"
-                    find "$TEMP_DIR" -type d -maxdepth 3 2>/dev/null | head -10
-                  fi
-                fi
+                sync_directory "$SRC" "$FINAL_TARGET" "$TEMP_DIR"
               done
               ;;
             
-            "full")
-              TARGET_PATH="$TARGET_BASE"
-              echo -e "  📦 Syncing full repository to: $TARGET_PATH"
+            "subdir")
+              # 同步子目录内容到目标目录（不保留子目录路径）
+              echo -e "  📁 Syncing subdirectory content: $SOURCE_PATHS -> $TARGET_PATH"
               
-              if [ -d "$TEMP_DIR" ]; then
+              if [ -d "$TEMP_DIR/$SOURCE_PATHS" ]; then
+                # 清空目标目录（如果需要完全替换）
+                rm -rf "$TARGET_PATH"
                 mkdir -p "$TARGET_PATH"
-                rsync -av --delete --exclude='.git' "$TEMP_DIR/" "$TARGET_PATH/" > /dev/null 2>&1
+                
+                # 同步子目录内容
+                rsync -av --delete "$TEMP_DIR/$SOURCE_PATHS/" "$TARGET_PATH/" > /dev/null 2>&1
                 FILE_COUNT=$(find "$TARGET_PATH" -type f 2>/dev/null | wc -l)
-                echo -e "  ${GREEN}✓ Full repo synced! Files: $FILE_COUNT${NC}"
+                echo -e "  ${GREEN}✓ Synced! Files: $FILE_COUNT${NC}"
+                
+                # 如果是 usteer-ng，检查 Makefile
+                if [[ "$TARGET_PATH" == *"usteer-ng"* ]]; then
+                  if [ -f "$TARGET_PATH/Makefile" ]; then
+                    echo -e "  ✅ Makefile found at: $TARGET_PATH/Makefile"
+                  fi
+                fi
               else
-                echo -e "  ${RED}✗ Source repository not found${NC}"
+                echo -e "  ${RED}✗ Source subdirectory not found: $SOURCE_PATHS${NC}"
+                echo -e "  Available directories:"
+                find "$TEMP_DIR" -type d -name "$(basename $SOURCE_PATHS)" 2>/dev/null | head -3
               fi
+              ;;
+            
+            "subdirs")
+              # 同步多个子目录到不同目标
+              IFS=' ' read -ra ITEMS <<< "$SOURCE_PATHS"
+              for item in "${ITEMS[@]}"; do
+                [ -z "$item" ] && continue
+                
+                # 格式: source_path:target_path
+                if [[ $item == *":"* ]]; then
+                  SRC="${item%:*}"
+                  TGT="${item#*:}"
+                else
+                  SRC="$item"
+                  TGT="$item"
+                fi
+                
+                # 如果指定了基础目标路径
+                if [ -n "$TARGET_PATH" ]; then
+                  FINAL_TARGET="$TARGET_PATH/$TGT"
+                else
+                  FINAL_TARGET="$TGT"
+                fi
+                
+                sync_directory "$SRC" "$FINAL_TARGET" "$TEMP_DIR"
+              done
+              ;;
+            
+            *)
+              echo -e "${RED}✗ Unknown sync mode: $SYNC_MODE${NC}"
               ;;
           esac
           
+          # 清理临时目录
           rm -rf "$TEMP_DIR"
         done
         
+        # 清理临时目录
         rm -rf temp_sync
+        
+        # 显示结果统计
+        echo -e "\n${BLUE}========================================${NC}"
+        echo -e "${BLUE}    Sync Summary${NC}"
+        echo -e "${BLUE}========================================${NC}"
+        
+        if [ ${#FAILED_TASKS[@]} -eq 0 ]; then
+          echo -e "${GREEN}✓ All tasks completed successfully!${NC}"
+        else
+          echo -e "${RED}✗ Failed tasks:${NC}"
+          for failed in "${FAILED_TASKS[@]}"; do
+            echo -e "  - $failed"
+          done
+        fi
         
         echo -e "\n${GREEN}Sync completed!${NC}"
     
-    - name: Fix usteer-ng Makefile for OpenWrt compilation
+    - name: Fix directory structure if needed
       run: |
-        if [ -d "usteer-ng" ]; then
-          echo "📝 Fixing usteer-ng Makefile..."
+        echo "📝 Checking for nested directory issues..."
+        
+        # 检查并修复可能的多层目录问题
+        if [ -d "usteer-ng/openwrt/usteer-ng" ]; then
+          echo "⚠️  Found nested directory structure in usteer-ng, fixing..."
           
-          # 检查 Makefile 位置
-          if [ -f "usteer-ng/Makefile" ]; then
-            echo "✅ Makefile found in usteer-ng/"
-            
-            # 检查 Makefile 内容
-            if grep -q "PKG_SOURCE_VERSION" usteer-ng/Makefile; then
-              echo "Makefile already has PKG_SOURCE_VERSION"
-            else
-              echo "⚠️  Makefile may need fixes"
-            fi
-          else
-            echo "❌ Makefile not found in usteer-ng/"
-            echo "Listing directory contents:"
-            ls -la usteer-ng/
+          # 备份
+          mv usteer-ng usteer-ng_backup
+          
+          # 移动正确的内容
+          if [ -d "usteer-ng_backup/openwrt/usteer-ng" ]; then
+            mv usteer-ng_backup/openwrt/usteer-ng usteer-ng
           fi
-        else
-          echo "⚠️  usteer-ng directory not found"
+          
+          # 清理备份
+          rm -rf usteer-ng_backup
+          echo "✅ Fixed nested directory structure"
         fi
+        
+        # 检查其他可能的嵌套目录
+        find . -type d -path "*/openwrt/*" -name "usteer-ng" 2>/dev/null | while read -r dir; do
+          echo "⚠️  Found nested directory: $dir"
+        done
     
     - name: Commit and push changes
       run: |
