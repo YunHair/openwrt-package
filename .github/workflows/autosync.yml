@@ -83,6 +83,7 @@ jobs:
           
           # 示例2: 同步子目录内容到目标目录（适用于 Makefile 在子目录的情况）
           "https://github.com/NilsRo/usteer-ng|development|subdir|openwrt/usteer-ng|usteer-ng"
+          "https://github.com/openwrt/luci|master|subdir|applications/luci-app-usteer|luci-app-usteer"
           
           # 示例3: 同步整个仓库
           "https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
