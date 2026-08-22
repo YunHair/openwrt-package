@@ -29,16 +29,14 @@ jobs:
         token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         fetch-depth: 0
     
-    - name: Install rsync and git tools
+    - name: Install rsync
       run: |
         sudo apt-get update
         sudo apt-get install -y rsync
     
     - name: Configure Git for public repos
       run: |
-        # 配置 Git 使用 HTTPS 而不是 SSH
         git config --global url."https://github.com/".insteadOf git@github.com:
-        # 设置用户信息
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
     
@@ -57,17 +55,23 @@ jobs:
         echo -e "${BLUE}========================================${NC}"
         
         # 定义同步任务
+        # 格式: "source_repo|branch|type|source_path|target_path"
+        # type: "dir" 表示目录克隆, "full" 表示整仓库克隆
+        # 对于 usteer-ng，使用 "dir" 类型并指定子目录路径
         SYNC_TASKS=(
-          "https://github.com/VIKINGYFY/packages|main|dir|gecoosac luci-app-gecoosac luci-app-wolultra|"
+          # 普通的整仓库同步
           "https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
-          "https://github.com/NilsRo/usteer-ng|development|full||usteer-ng"
+          
+          # 从 VIKINGYFY/packages 同步多个目录
+          "https://github.com/VIKINGYFY/packages|main|dir|gecoosac luci-app-gecoosac luci-app-wolultra|"
+          
+          # usteer-ng: 同步子目录 openwrt/usteer-ng 到 usteer-ng
+          "https://github.com/NilsRo/usteer-ng|development|dir|openwrt/usteer-ng|usteer-ng"
         )
         
-        # 创建临时目录
         mkdir -p temp_sync
         
-        # 处理每个同步任务
         for task in "${SYNC_TASKS[@]}"; do
           IFS='|' read -r REPO BRANCH TYPE SOURCE_DIRS TARGET_BASE <<< "$task"
           
@@ -75,17 +79,14 @@ jobs:
           echo -e "Processing: ${BLUE}$REPO${NC} (type: $TYPE)"
           echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
           
-          # 生成临时目录名
           TEMP_DIR="temp_sync/$(echo $REPO | md5sum | cut -c1-8)"
           
-          # 克隆仓库 - 改进的克隆方法
           echo "📦 Cloning repository..."
           
-          # 方法1: 直接克隆（使用配置的全局设置）
+          # 尝试克隆
           if git clone --depth 1 --single-branch --branch $BRANCH $REPO $TEMP_DIR 2>&1; then
             echo -e "${GREEN}✓ Clone successful${NC}"
           else
-            # 方法2: 如果失败，尝试使用 PAT 认证（即使是公开仓库）
             echo "  Trying with PAT authentication..."
             REPO_NAME=$(basename $REPO .git)
             AUTH_REPO="https://YunHair:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/NilsRo/${REPO_NAME}.git"
@@ -93,14 +94,8 @@ jobs:
             if git clone --depth 1 --single-branch --branch $BRANCH $AUTH_REPO $TEMP_DIR 2>&1; then
               echo -e "${GREEN}✓ Clone successful with PAT${NC}"
             else
-              # 方法3: 尝试不带分支指定
-              echo "  Trying without branch specification..."
-              if git clone --depth 1 $REPO $TEMP_DIR 2>&1; then
-                echo -e "${GREEN}✓ Clone successful (no branch)${NC}"
-              else
-                echo -e "${RED}✗ Clone failed, skipping...${NC}"
-                continue
-              fi
+              echo -e "${RED}✗ Clone failed, skipping...${NC}"
+              continue
             fi
           fi
           
@@ -135,10 +130,21 @@ jobs:
                   rsync -av --delete "$TEMP_DIR/$SRC/" "$TARGET_PATH/" > /dev/null 2>&1
                   FILE_COUNT=$(find "$TARGET_PATH" -type f 2>/dev/null | wc -l)
                   echo -e "  ${GREEN}✓ Synced! Files: $FILE_COUNT${NC}"
+                  
+                  # 如果是 usteer-ng，显示修复信息
+                  if [[ "$TARGET_PATH" == "usteer-ng" ]]; then
+                    echo -e "  ℹ️  usteer-ng synced from subdirectory: openwrt/usteer-ng"
+                  fi
                 else
                   echo -e "  ${RED}✗ Source not found: $SRC${NC}"
-                  echo -e "  Available directories:"
-                  ls -d $TEMP_DIR/*/ 2>/dev/null | head -5
+                  
+                  # 显示可用目录帮助调试
+                  if [[ "$REPO" == *"usteer-ng"* ]]; then
+                    echo -e "  Available directories in repo:"
+                    find "$TEMP_DIR" -type d -name "usteer-ng" 2>/dev/null | head -5
+                    echo -e "  Full directory structure (first 3 levels):"
+                    find "$TEMP_DIR" -type d -maxdepth 3 2>/dev/null | head -10
+                  fi
                 fi
               done
               ;;
@@ -158,37 +164,53 @@ jobs:
               ;;
           esac
           
-          # 清理
           rm -rf "$TEMP_DIR"
         done
         
-        # 清理临时目录
         rm -rf temp_sync
         
         echo -e "\n${GREEN}Sync completed!${NC}"
     
+    - name: Fix usteer-ng Makefile for OpenWrt compilation
+      run: |
+        if [ -d "usteer-ng" ]; then
+          echo "📝 Fixing usteer-ng Makefile..."
+          
+          # 检查 Makefile 位置
+          if [ -f "usteer-ng/Makefile" ]; then
+            echo "✅ Makefile found in usteer-ng/"
+            
+            # 检查 Makefile 内容
+            if grep -q "PKG_SOURCE_VERSION" usteer-ng/Makefile; then
+              echo "Makefile already has PKG_SOURCE_VERSION"
+            else
+              echo "⚠️  Makefile may need fixes"
+            fi
+          else
+            echo "❌ Makefile not found in usteer-ng/"
+            echo "Listing directory contents:"
+            ls -la usteer-ng/
+          fi
+        else
+          echo "⚠️  usteer-ng directory not found"
+        fi
+    
     - name: Commit and push changes
       run: |
-        # 配置 Git
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
-        # 设置远程URL（使用个人令牌）
         REMOTE_URL="https://YunHair:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/YunHair/openwrt-package.git"
         git remote set-url origin $REMOTE_URL
         
-        # 添加所有更改
         git add -A
         
-        # 检查是否有变更
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
-          # 生成提交信息
           TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
           COMMIT_MSG="Auto sync from multiple sources - $TIMESTAMP"
           
-          # 添加更改统计
           CHANGED_FILES=$(git diff --staged --name-only | wc -l)
           COMMIT_MSG="$COMMIT_MSG
 
