@@ -79,18 +79,19 @@ jobs:
         
         SYNC_TASKS=(
           # 示例1: 同步多个目录（从同一仓库）
-          "https://github.com/VIKINGYFY/packages|main|dirs|gecoosac luci-app-gecoosac luci-app-wolultra|"
+          "https://github.com/VIKINGYFY/packages|main|dirs|luci-app-wolultra|"
+          "https://github.com/laipeng668/luci-app-gecoosac|main|dirs|gecoosac luci-app-gecoosac|"
+          "https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|dirs|luci-app-tailscale-community|"
+
+
           
           # 示例2: 同步子目录内容到目标目录（适用于 Makefile 在子目录的情况）
-          "https://github.com/NilsRo/usteer-ng|development|subdir|openwrt/usteer-ng|usteer-ng"
-          "https://github.com/openwrt/luci|master|subdir|applications/luci-app-usteer|luci-app-usteer"
+          #"https://github.com/NilsRo/usteer-ng|development|subdir|openwrt/usteer-ng|usteer-ng"        
           
           # 示例3: 同步整个仓库
-          "https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
-          
-          # 示例4: 同步整个仓库
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
-          
+          #"https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
+
           # ============================================
           # 更多示例（注释掉，需要时取消注释）
           # ============================================
