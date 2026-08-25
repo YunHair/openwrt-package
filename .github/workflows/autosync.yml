@@ -82,6 +82,7 @@ jobs:
           "https://github.com/VIKINGYFY/packages|main|dirs|luci-app-wolultra|"
           "https://github.com/laipeng668/luci-app-gecoosac|main|dirs|gecoosac luci-app-gecoosac|"
           "https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|dirs|luci-app-tailscale-community|"
+          "https://github.com/kenzok8/small-package|main|dirs|oaf open-app-filter luci-app-oaf|"
           "https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
           
 
@@ -91,13 +92,15 @@ jobs:
           #"https://github.com/NilsRo/usteer-ng|development|subdir|openwrt/usteer-ng|usteer-ng"        
           
           # 示例3: 同步整个仓库
-          "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
-          #"https://github.com/torguardvpn/luci-app-easymesh|main|full||luci-app-easymesh"
+          "https://github.com/sirpdboy/luci-app-advancedplus|main|full| |luci-app-advancedplus"
+          #"https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|full| |luci-app-tailscale-community"
+          # "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
+          
 
           # ============================================
           # 更多示例（注释掉，需要时取消注释）
           # ============================================
-          
+        
           # 示例5: 同步单个子目录
           # "https://github.com/example/repo|main|subdir|path/to/subdir|custom-target"
           
