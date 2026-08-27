@@ -85,16 +85,17 @@ jobs:
           "https://github.com/kenzok8/small-package|main|dirs|oaf open-app-filter luci-app-oaf |"
           "https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
           "https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
-
-
-          
-          # 示例2: 同步子目录内容到目标目录（适用于 Makefile 在子目录的情况）
-          #"https://github.com/NilsRo/usteer-ng|development|subdir|openwrt/usteer-ng|usteer-ng"        
           
           # 示例3: 同步整个仓库
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full| |luci-app-advancedplus"
           "https://github.com/aimeeacker/luci-app-zerotier|main|full| |luci-app-zerotier"
-          # "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
+          "https://github.com/eamonxg/luci-theme-aurora|master|full||luci-theme-aurora"
+          "https://github.com/eamonxg/luci-app-aurora-config|master|full||luci-app-aurora-config"
+
+          
+          # 示例2: 同步子目录内容到目标目录（适用于 Makefile 在子目录的情况）
+          #"https://github.com/NilsRo/usteer-ng|development|subdir|openwrt/usteer-ng|usteer-ng"        
+
           
 
           # ============================================
