@@ -93,7 +93,7 @@ jobs:
           
           # 示例3: 同步整个仓库
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full| |luci-app-advancedplus"
-          #"https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|full| |luci-app-tailscale-community"
+          "https://github.com/aimeeacker/luci-app-zerotier|main|full| |luci-app-zerotier"
           # "https://github.com/sirpdboy/luci-app-advancedplus|main|full||luci-app-advancedplus"
           
 
