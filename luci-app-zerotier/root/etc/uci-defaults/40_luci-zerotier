@@ -1,0 +1,17 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@zerotier[-1]
+	commit ucitrack
+
+	delete firewall.zerotier
+	commit firewall
+EOF
+
+# Remove files left by the superseded standalone Controller LuCI package.
+rm -f /usr/share/luci/menu.d/luci-app-zerotier-controller.json
+rm -f /usr/share/rpcd/acl.d/luci-app-zerotier-controller.json
+rm -rf /www/luci-static/resources/view/zerotier_controller
+rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*
+
+exit 0

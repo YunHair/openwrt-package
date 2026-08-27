@@ -1,0 +1,793 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
+ztc_input_file=""
+clean_ztc_tmp() {
+	[ -n "$ztc_input_file" ] && [ -f "$ztc_input_file" ] && rm -f "$ztc_input_file"
+}
+trap clean_ztc_tmp EXIT INT TERM
+
+if [ "$1" = "call" ] && [ -z "${ZT_RPC_INPUT_FILE:-}" ]; then
+	ztc_input_file="$(mktemp /tmp/ztc_in.XXXXXX)" || exit 1
+	cat > "$ztc_input_file"
+	export ZT_RPC_INPUT_FILE="$ztc_input_file"
+fi
+
+ucode_script="${ZT_UCODE_SCRIPT:-/usr/libexec/rpcd/zerotier-controller.ucode}"
+ucode_bin="${ZT_UCODE_BIN:-ucode}"
+# Probe the exact fs imports the ucode implementation needs so that devices
+# with an older fs module fall back to this shell implementation entirely.
+if [ -f "$ucode_script" ] &&
+	command -v "$ucode_bin" >/dev/null 2>&1 &&
+	"$ucode_bin" -e "import { readfile, popen, stat, statvfs, mkstemp, mkdtemp, writefile, unlink, rmdir } from 'fs';" >/dev/null 2>&1; then
+	ucode_out="$(mktemp /tmp/ztc_out.XXXXXX 2>/dev/null)" || ucode_out=""
+	if [ -n "$ucode_out" ]; then
+		if "$ucode_bin" "$ucode_script" "$@" < "${ZT_RPC_INPUT_FILE:-/dev/null}" > "$ucode_out" 2>/dev/null; then
+			if jq -e . "$ucode_out" >/dev/null 2>&1; then
+				cat "$ucode_out"
+				rm -f "$ucode_out"
+				exit 0
+			fi
+		fi
+		rm -f "$ucode_out"
+	fi
+
+	case "$2" in
+		create_network|update_ip_pool|authorize_member|change_member_ip|rename_member|add_route|del_route|delete_member|import_backup)
+			echo '{"error": "ucode execution failed for mutating operation"}'
+			exit 1
+			;;
+	esac
+fi
+
+get_token() {
+	if [ -n "${ZT_CONTROLLER_TOKEN:-}" ]; then
+		printf '%s' "$ZT_CONTROLLER_TOKEN"
+	elif [ -f /var/lib/zerotier-one/authtoken.secret ]; then
+		tr -d '\r\n' < /var/lib/zerotier-one/authtoken.secret
+	elif [ -f /etc/zerotier/authtoken.secret ]; then
+		tr -d '\r\n' < /etc/zerotier/authtoken.secret
+	else
+		echo ""
+	fi
+}
+
+json_error() {
+	message="$1"
+	method="${2:-}"
+	path="${3:-}"
+	http_status="${4:-0}"
+
+	jq -cn \
+		--arg error "$message" \
+		--arg method "$method" \
+		--arg path "$path" \
+		--argjson http_status "$http_status" \
+		'{ error: $error, method: $method, path: $path, http_status: $http_status }'
+}
+
+has_error() {
+	printf '%s' "$1" | jq -e 'type == "object" and (.error? != null)' >/dev/null 2>&1
+}
+
+valid_nwid() {
+	case "$1" in
+		*[!0-9a-fA-F]*|'') return 1 ;;
+	esac
+	[ "${#1}" -eq 16 ]
+}
+
+valid_nodeid() {
+	case "$1" in
+		*[!0-9a-fA-F]*|'') return 1 ;;
+	esac
+	[ "${#1}" -eq 10 ]
+}
+
+ipv4_from_int() {
+	value="$1"
+	printf '%d.%d.%d.%d' \
+		"$((value / 16777216 % 256))" \
+		"$((value / 65536 % 256))" \
+		"$((value / 256 % 256))" \
+		"$((value % 256))"
+}
+
+parse_ipv4_cidr() {
+	cidr_values="$(jq -rn --arg cidr "$1" '
+		$cidr
+		| capture("^(?<a>[0-9]{1,3})\\.(?<b>[0-9]{1,3})\\.(?<c>[0-9]{1,3})\\.(?<d>[0-9]{1,3})/(?<prefix>[0-9]{1,2})$")?
+		| select(. != null)
+		| [ .a, .b, .c, .d, .prefix ] | map(tonumber)
+		| select(.[0:4] | all(. >= 0 and . <= 255))
+		| select(.[4] >= 8 and .[4] <= 30)
+		| @tsv
+	' 2>/dev/null)"
+	[ -n "$cidr_values" ] || return 1
+
+	cidr_a="$(printf '%s' "$cidr_values" | cut -f1)"
+	cidr_b="$(printf '%s' "$cidr_values" | cut -f2)"
+	cidr_c="$(printf '%s' "$cidr_values" | cut -f3)"
+	cidr_d="$(printf '%s' "$cidr_values" | cut -f4)"
+	CIDR_PREFIX="$(printf '%s' "$cidr_values" | cut -f5)"
+
+	cidr_value="$((cidr_a * 16777216 + cidr_b * 65536 + cidr_c * 256 + cidr_d))"
+	cidr_block_size="$((1 << (32 - CIDR_PREFIX)))"
+	cidr_network_value="$((cidr_value / cidr_block_size * cidr_block_size))"
+	cidr_broadcast_value="$((cidr_network_value + cidr_block_size - 1))"
+
+	CIDR_NETWORK="$(ipv4_from_int "$cidr_network_value")"
+	CIDR_FIRST="$(ipv4_from_int "$((cidr_network_value + 1))")"
+	CIDR_LAST="$(ipv4_from_int "$((cidr_broadcast_value - 1))")"
+}
+
+read_rpc_input() {
+	rpc_method="$1"
+	if [ -n "${ZT_RPC_INPUT_FILE:-}" ] && [ -f "$ZT_RPC_INPUT_FILE" ]; then
+		input="$(cat "$ZT_RPC_INPUT_FILE")"
+	else
+		input=''
+		IFS= read -r input || input=""
+	fi
+	if ! printf '%s' "$input" | jq -e 'type == "object"' >/dev/null 2>&1; then
+		json_error "invalid RPC request JSON" RPC "$rpc_method" 0
+		return 1
+	fi
+}
+
+zt_api() {
+	method="$1"
+	path="$2"
+	data="$3"
+
+	token="$(get_token)"
+
+	if [ -z "$token" ]; then
+		json_error "authtoken.secret not found" "$method" "$path" 0
+		return
+	fi
+
+	body_file="$(mktemp /tmp/zerotier-controller.XXXXXX)" || {
+		json_error "failed to create temporary response file" "$method" "$path" 0
+		return
+	}
+
+	# The token and payload travel through 0600 temp files instead of argv so
+	# they never show up in /proc/*/cmdline and the payload size is not capped
+	# by execve argument limits.
+	header_file="$(mktemp /tmp/zerotier-controller.XXXXXX)" || {
+		rm -f "$body_file"
+		json_error "failed to create temporary header file" "$method" "$path" 0
+		return
+	}
+	printf 'X-ZT1-AUTH: %s\n' "$token" > "$header_file"
+
+	if [ -n "$data" ]; then
+		data_file="$(mktemp /tmp/zerotier-controller.XXXXXX)" || {
+			rm -f "$body_file" "$header_file"
+			json_error "failed to create temporary payload file" "$method" "$path" 0
+			return
+		}
+		printf 'Content-Type: application/json\n' >> "$header_file"
+		printf '%s' "$data" > "$data_file"
+		http_status="$(curl -sS -o "$body_file" -w '%{http_code}' -X "$method" \
+			-H "@$header_file" \
+			--data-binary "@$data_file" \
+			"http://127.0.0.1:9993$path")"
+		curl_status="$?"
+		rm -f "$data_file"
+	else
+		http_status="$(curl -sS -o "$body_file" -w '%{http_code}' -X "$method" \
+			-H "@$header_file" \
+			"http://127.0.0.1:9993$path")"
+		curl_status="$?"
+	fi
+	rm -f "$header_file"
+	body="$(cat "$body_file")"
+	rm -f "$body_file"
+
+	case "$http_status" in
+		[0-9][0-9][0-9]) ;;
+		*) http_status=0 ;;
+	esac
+
+	if [ "$curl_status" -ne 0 ]; then
+		json_error "unable to contact ZeroTier service API" "$method" "$path" "$http_status"
+		return
+	fi
+
+	case "$http_status" in
+		2??)
+			if [ -z "$body" ]; then
+				echo '{}'
+			elif printf '%s' "$body" | jq -e . >/dev/null 2>&1; then
+				printf '%s\n' "$body"
+			else
+				json_error "ZeroTier API returned invalid JSON" "$method" "$path" "$http_status"
+			fi
+			;;
+		*)
+			api_message="$(printf '%s' "$body" | jq -r '.error // .message // .description // empty' 2>/dev/null)"
+			[ -n "$api_message" ] || api_message="ZeroTier API request failed"
+			json_error "$api_message" "$method" "$path" "$http_status"
+			;;
+	esac
+}
+
+case "$1" in
+	list)
+		echo '{'
+		echo '  "status": {},'
+		echo '  "list_networks": {},'
+		echo '  "get_network_info": { "nwid": "string" },'
+		echo '  "create_network": { "name": "string", "cidr": "string" },'
+		echo '  "update_ip_pool": { "nwid": "string", "cidr": "string", "old_cidr": "string" },'
+		echo '  "list_members": { "nwid": "string", "online_only": "boolean" },'
+		echo '  "authorize_member": { "nwid": "string", "nodeid": "string", "authorized": "boolean" },'
+		echo '  "change_member_ip": { "nwid": "string", "nodeid": "string", "ip_assignments": "array" },'
+		echo '  "rename_member": { "nwid": "string", "nodeid": "string", "name": "string" },'
+		echo '  "add_route": { "nwid": "string", "target": "string", "via": "string" },'
+		echo '  "del_route": { "nwid": "string", "target": "string" },'
+		echo '  "delete_member": { "nwid": "string", "nodeid": "string" },'
+		echo '  "export_backup": { "nwid": "string" },'
+		echo '  "import_backup": { "backup_data": "string", "mode": "string" }'
+		echo '}'
+		;;
+	call)
+		case "$2" in
+			status)
+				zt_dir=""
+				[ -d /var/lib/zerotier-one ] && zt_dir="/var/lib/zerotier-one"
+				[ -z "$zt_dir" ] && [ -d /etc/zerotier ] && zt_dir="/etc/zerotier"
+
+				token_present=false
+				[ -n "$zt_dir" ] && [ -f "$zt_dir/authtoken.secret" ] && token_present=true
+
+				storage_writable=false
+				if [ -n "$zt_dir" ] && [ -d "$zt_dir" ]; then
+					test_file="$zt_dir/.ztc_write_test_$$"
+					if touch "$test_file" 2>/dev/null; then
+						rm -f "$test_file"
+						storage_writable=true
+					fi
+				fi
+
+				free_space=-1
+				if [ -n "$zt_dir" ]; then
+					free_space="$(df -k "$zt_dir" 2>/dev/null | awk 'NR==2 {print $4 * 1024}')"
+					case "$free_space" in *[!0-9]*|'') free_space=-1 ;; esac
+				fi
+
+				node_status="$(zt_api GET /status)"
+				if has_error "$node_status"; then
+					jq -cn \
+						--argjson node "$node_status" \
+						--arg zt_dir "$zt_dir" \
+						--argjson token_present "$token_present" \
+						--argjson storage_writable "$storage_writable" \
+						--argjson free_space "$free_space" \
+						'$node + { online: false, controller: false, databaseReady: false, storagePath: (if $zt_dir == "" then null else $zt_dir end), tokenPresent: $token_present, storageWritable: $storage_writable, freeSpaceBytes: $free_space }'
+				else
+					controller_status="$(zt_api GET /controller)"
+					if has_error "$controller_status"; then
+						jq -cn \
+							--argjson node "$node_status" \
+							--argjson controller_error "$controller_status" \
+							--arg zt_dir "$zt_dir" \
+							--argjson token_present "$token_present" \
+							--argjson storage_writable "$storage_writable" \
+							--argjson free_space "$free_space" \
+							'$node + { controller: false, databaseReady: false, controllerError: $controller_error.error, controllerHttpStatus: $controller_error.http_status, storagePath: (if $zt_dir == "" then null else $zt_dir end), tokenPresent: $token_present, storageWritable: $storage_writable, freeSpaceBytes: $free_space }'
+					else
+						jq -cn \
+							--argjson node "$node_status" \
+							--argjson controller_status "$controller_status" \
+							--arg zt_dir "$zt_dir" \
+							--argjson token_present "$token_present" \
+							--argjson storage_writable "$storage_writable" \
+							--argjson free_space "$free_space" \
+							'$node + { controller: ($controller_status.controller == true), databaseReady: ($controller_status.databaseReady == true), controllerApiVersion: $controller_status.apiVersion, storagePath: (if $zt_dir == "" then null else $zt_dir end), tokenPresent: $token_present, storageWritable: $storage_writable, freeSpaceBytes: $free_space }'
+					fi
+				fi
+				;;
+			list_networks)
+				res="$(zt_api GET /controller/network)"
+				if has_error "$res"; then
+					printf '%s' "$res" | jq -c '. + { networks: [] }'
+				else
+					network_ids="$(printf '%s' "$res" | jq -r '
+						if type == "array" then .[]?
+						elif type == "object" then keys[]?
+						else empty
+						end
+						| if type == "string" then .
+						  elif type == "object" then (.id // .nwid // empty)
+						  else empty
+						  end
+					' 2>/dev/null)"
+					networks='[]'
+					for nwid in $network_ids; do
+						valid_nwid "$nwid" || continue
+						net_detail="$(zt_api GET "/controller/network/$nwid")"
+						if has_error "$net_detail"; then
+							name=''
+						else
+							name="$(printf '%s' "$net_detail" | jq -r '(.name // "") | tostring')"
+						fi
+						networks="$(jq -cn \
+							--argjson networks "$networks" \
+							--arg id "$nwid" \
+							--arg name "$name" \
+							'$networks + [{ id: $id, name: $name }]')"
+					done
+					jq -cn --argjson networks "$networks" '{ networks: $networks }'
+				fi
+				;;
+			get_network_info)
+				if ! read_rpc_input get_network_info; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				if ! valid_nwid "$nwid"; then
+					echo '{"error": "missing nwid"}'
+				else
+					zt_api GET "/controller/network/$nwid"
+				fi
+				;;
+			create_network)
+				if ! read_rpc_input create_network; then exit 0; fi
+				name="$(printf '%s' "$input" | jq -r '(.name // "") | tostring')"
+				[ -n "$name" ] || name="new_network"
+				cidr="$(printf '%s' "$input" | jq -r '(.cidr // "") | tostring')"
+
+				# Keep backward compatibility for callers that omit CIDR while allowing
+				# the LuCI form to create a network with an explicit managed subnet.
+				if [ -z "$cidr" ]; then
+					rand_x_seed="$(od -An -N1 -tu1 /dev/urandom 2>/dev/null | tr -d ' ')"
+					rand_y_seed="$(od -An -N1 -tu1 /dev/urandom 2>/dev/null | tr -d ' ')"
+					case "$rand_x_seed" in *[!0-9]*|'') rand_x_seed=120 ;; esac
+					case "$rand_y_seed" in *[!0-9]*|'') rand_y_seed=50 ;; esac
+					rand_x="$(( (rand_x_seed % 120) + 100 ))"
+					rand_y="$(( (rand_y_seed % 250) + 1 ))"
+					cidr="10.${rand_x}.${rand_y}.0/24"
+				fi
+
+				if ! parse_ipv4_cidr "$cidr"; then
+					echo '{"error": "IPv4 CIDR must use a prefix between /8 and /30"}'
+					exit 0
+				fi
+
+				normalized_cidr="${CIDR_NETWORK}/${CIDR_PREFIX}"
+				payload="$(jq -cn \
+					--arg name "$name" \
+					--arg ip_start "$CIDR_FIRST" \
+					--arg ip_end "$CIDR_LAST" \
+					--arg route "$normalized_cidr" \
+					'{ name: $name, private: true, v4AssignMode: { zt: true }, ipAssignmentPools: [{ ipRangeStart: $ip_start, ipRangeEnd: $ip_end }], routes: [{ target: $route, via: null }] }')"
+				zt_api POST /controller/network "$payload"
+				;;
+			update_ip_pool)
+				if ! read_rpc_input update_ip_pool; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				cidr="$(printf '%s' "$input" | jq -r '.cidr // empty')"
+				old_cidr="$(printf '%s' "$input" | jq -r '.old_cidr // empty')"
+
+				if ! valid_nwid "$nwid"; then
+					echo '{"error": "invalid network ID"}'
+					exit 0
+				fi
+				if ! parse_ipv4_cidr "$cidr"; then
+					echo '{"error": "IPv4 CIDR must use a prefix between /8 and /30"}'
+					exit 0
+				fi
+
+				normalized_cidr="${CIDR_NETWORK}/${CIDR_PREFIX}"
+				net_json="$(zt_api GET "/controller/network/$nwid")"
+				if has_error "$net_json"; then
+					printf '%s\n' "$net_json"
+					exit 0
+				fi
+
+				# Replace only the direct route shown by the editor, preserve routed
+				# subnets and every unrelated direct route, and de-duplicate the new CIDR.
+				new_routes="$(printf '%s' "$net_json" | jq -c \
+					--arg old "$old_cidr" \
+					--arg new "$normalized_cidr" '
+					[ (.routes // [])[]
+					  | select(.target != $new)
+					  | select(($old == "") or (.target != $old) or (.via != null))
+					] + [{ target: $new, via: null }]
+				')"
+				v4_mode="$(printf '%s' "$net_json" | jq -c '(.v4AssignMode // {}) + { zt: true }')"
+				payload="$(jq -cn \
+					--arg start "$CIDR_FIRST" \
+					--arg last "$CIDR_LAST" \
+					--arg cidr "$normalized_cidr" \
+					--argjson mode "$v4_mode" \
+					--argjson routes "$new_routes" \
+					'{ v4AssignMode: $mode, ipAssignmentPools: [{ ipRangeStart: $start, ipRangeEnd: $last }], routes: $routes, requestedCidr: $cidr }'
+				)"
+				# requestedCidr is useful to the UI but is not part of the Controller schema.
+				api_payload="$(printf '%s' "$payload" | jq -c 'del(.requestedCidr)')"
+				result="$(zt_api POST "/controller/network/$nwid" "$api_payload")"
+				if has_error "$result"; then
+					printf '%s\n' "$result"
+				else
+					printf '%s' "$result" | jq -c \
+						--arg cidr "$normalized_cidr" \
+						--arg start "$CIDR_FIRST" \
+						--arg last "$CIDR_LAST" \
+						'. + { cidr: $cidr, ipRangeStart: $start, ipRangeEnd: $last }'
+				fi
+				;;
+			list_members)
+				if ! read_rpc_input list_members; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				online_only="$(printf '%s' "$input" | jq -r 'if .online_only == true then "true" else "false" end')"
+				if ! valid_nwid "$nwid"; then
+					echo '{"error": "missing nwid"}'
+					exit 0
+				fi
+
+				members_index="$(zt_api GET "/controller/network/$nwid/member")"
+				if has_error "$members_index"; then
+					printf '%s' "$members_index" | jq -c '. + { members: [], peers: [] }'
+					exit 0
+				fi
+
+				peers_list="$(zt_api GET "/peer")"
+				if has_error "$peers_list"; then
+					peers_list='[]'
+				fi
+
+				online_peers=""
+				if [ "$online_only" = "true" ]; then
+					ctrl_nodeid="$(printf '%.10s' "$nwid" | tr '[:upper:]' '[:lower:]')"
+					online_peers="$(printf '%s' "$peers_list" | jq -r \
+						--arg ctrl "$ctrl_nodeid" '
+						[ $ctrl,
+						  ( .[]?
+						    | select((.latency // -1) >= 0 or (((.paths // []) | map(select(.active == true or .preferred == true))) | length > 0))
+						    | (.address // empty)
+						    | ascii_downcase
+						  )
+						] | unique | join(" ")
+					' 2>/dev/null)"
+				fi
+
+				members_list='[]'
+				for nodeid in $(printf '%s' "$members_index" | jq -r 'keys[]?'); do
+					if [ "$online_only" = "true" ]; then
+						nodeid_lc="$(printf '%s' "$nodeid" | tr '[:upper:]' '[:lower:]')"
+						case " $online_peers " in
+							*" $nodeid_lc "*) ;;
+							*) continue ;;
+						esac
+					fi
+					member="$(zt_api GET "/controller/network/$nwid/member/$nodeid")"
+					if ! has_error "$member"; then
+						members_list="$(jq -cn --argjson members "$members_list" --argjson member "$member" '$members + [$member]')"
+					fi
+				done
+
+				jq -cn --argjson members "$members_list" --argjson peers "$peers_list" '{ members: $members, peers: $peers }'
+				;;
+			authorize_member)
+				if ! read_rpc_input authorize_member; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				nodeid="$(printf '%s' "$input" | jq -r '.nodeid // empty')"
+				auth="$(printf '%s' "$input" | jq -r 'if .authorized == true then "true" else "false" end')"
+				
+				if ! valid_nwid "$nwid" || ! valid_nodeid "$nodeid"; then
+					echo '{"error": "missing parameters"}'
+				else
+					zt_api POST "/controller/network/$nwid/member/$nodeid" "{\"authorized\": $auth}"
+				fi
+				;;
+			change_member_ip)
+				if ! read_rpc_input change_member_ip; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				nodeid="$(printf '%s' "$input" | jq -r '.nodeid // empty')"
+				ips="$(printf '%s' "$input" | jq -c '.ip_assignments // []')"
+				
+				if ! valid_nwid "$nwid" || ! valid_nodeid "$nodeid"; then
+					echo '{"error": "missing parameters"}'
+				else
+					payload="$(jq -cn --argjson ips "$ips" '{ ipAssignments: $ips }')"
+					zt_api POST "/controller/network/$nwid/member/$nodeid" "$payload"
+				fi
+				;;
+			rename_member)
+				if ! read_rpc_input rename_member; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				nodeid="$(printf '%s' "$input" | jq -r '.nodeid // empty')"
+				name="$(printf '%s' "$input" | jq -r '.name // ""')"
+				
+				if ! valid_nwid "$nwid" || ! valid_nodeid "$nodeid"; then
+					echo '{"error": "missing parameters"}'
+				else
+					payload="$(jq -cn --arg name "$name" '{ name: $name }')"
+					zt_api POST "/controller/network/$nwid/member/$nodeid" "$payload"
+				fi
+				;;
+			add_route)
+				if ! read_rpc_input add_route; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				target="$(printf '%s' "$input" | jq -r '.target // empty')"
+				via="$(printf '%s' "$input" | jq -r '.via // empty')"
+				
+				if ! valid_nwid "$nwid" || [ -z "$target" ]; then
+					echo '{"error": "missing parameters"}'
+				else
+					net_json="$(zt_api GET "/controller/network/$nwid")"
+					if has_error "$net_json"; then
+						printf '%s\n' "$net_json"
+						exit 0
+					fi
+					# Replace any existing route for the same target instead of
+					# appending a duplicate (same semantics as the ucode engine).
+					if [ -z "$via" ] || [ "$via" = "null" ]; then
+						new_routes="$(printf '%s' "$net_json" | jq --arg t "$target" '[ (.routes // [])[] | select(.target != $t) ] + [{"target": $t, "via": null}]')"
+					else
+						new_routes="$(printf '%s' "$net_json" | jq --arg t "$target" --arg v "$via" '[ (.routes // [])[] | select(.target != $t) ] + [{"target": $t, "via": $v}]')"
+					fi
+					payload="$(jq -cn --argjson routes "$new_routes" '{ routes: $routes }')"
+					zt_api POST "/controller/network/$nwid" "$payload"
+				fi
+				;;
+			del_route)
+				if ! read_rpc_input del_route; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				target="$(printf '%s' "$input" | jq -r '.target // empty')"
+				
+				if ! valid_nwid "$nwid" || [ -z "$target" ]; then
+					echo '{"error": "missing parameters"}'
+				else
+					net_json="$(zt_api GET "/controller/network/$nwid")"
+					if has_error "$net_json"; then
+						printf '%s\n' "$net_json"
+						exit 0
+					fi
+					new_routes="$(printf '%s' "$net_json" | jq --arg t "$target" '[ (.routes // [])[] | select(.target != $t) ]')"
+					payload="$(jq -cn --argjson routes "$new_routes" '{ routes: $routes }')"
+					zt_api POST "/controller/network/$nwid" "$payload"
+				fi
+				;;
+			delete_member)
+				if ! read_rpc_input delete_member; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				nodeid="$(printf '%s' "$input" | jq -r '.nodeid // empty')"
+				
+				if ! valid_nwid "$nwid" || ! valid_nodeid "$nodeid"; then
+					echo '{"error": "missing parameters"}'
+				else
+					zt_api DELETE "/controller/network/$nwid/member/$nodeid"
+				fi
+				;;
+			export_backup)
+				if ! read_rpc_input export_backup; then exit 0; fi
+				nwid="$(printf '%s' "$input" | jq -r '.nwid // empty')"
+				if ! valid_nwid "$nwid"; then
+					echo '{"error": "missing nwid"}'
+				else
+					net="$(zt_api GET "/controller/network/$nwid")"
+					members_map="$(zt_api GET "/controller/network/$nwid/member")"
+					if has_error "$net"; then printf '%s\n' "$net"; exit 0; fi
+					if has_error "$members_map"; then printf '%s\n' "$members_map"; exit 0; fi
+					if ! printf '%s' "$members_map" | jq -e 'type == "object"' >/dev/null 2>&1; then
+						echo '{"error": "controller returned an invalid member index"}'
+						exit 0
+					fi
+
+					members_obj="{}"
+					for nodeid in $(printf '%s' "$members_map" | jq -r 'keys[]?'); do
+						m_detail="$(zt_api GET "/controller/network/$nwid/member/$nodeid")"
+						if has_error "$m_detail"; then printf '%s\n' "$m_detail"; exit 0; fi
+						members_obj="$(printf '%s' "$members_obj" | jq --arg nid "$nodeid" --argjson m "$m_detail" '. + {($nid): $m}')"
+					done
+
+					jq -n --arg nwid "$nwid" --argjson net "$net" --argjson members "$members_obj" '{
+						nwid: $nwid,
+						backup_time: (now | strftime("%Y-%m-%d %H:%M:%S")),
+						network: $net,
+						members: $members
+					}'
+				fi
+				;;
+			import_backup)
+				if ! read_rpc_input import_backup; then exit 0; fi
+				backup_json="$(printf '%s' "$input" | jq -r '.backup_data // empty')"
+				import_mode="$(printf '%s' "$input" | jq -r '(.mode // "restore") | tostring')"
+				case "$import_mode" in
+					restore|migrate) ;;
+					*)
+						echo '{"error": "invalid import mode, expected restore or migrate"}'
+						exit 0
+						;;
+				esac
+				if [ -z "$backup_json" ]; then
+					echo '{"error": "missing backup data"}'
+					exit 0
+				fi
+
+				if [ "${#backup_json}" -gt 2097152 ]; then
+					echo '{"error": "Backup payload exceeds 2 MB limit"}'
+					exit 0
+				fi
+
+				if ! printf '%s' "$backup_json" | jq -e '
+					type == "object" and
+					(.network | type) == "object" and
+					((.members | type) == "object" or (.members | type) == "array")
+				' >/dev/null 2>&1; then
+					echo '{"error": "invalid backup format"}'
+					exit 0
+				fi
+
+				nwid="$(printf '%s' "$backup_json" | jq -r '
+					(.nwid // .network.id // .network.nwid // empty) |
+					if type == "string" then . else empty end
+				')"
+				net_config="$(printf '%s' "$backup_json" | jq -c '.network')"
+				if ! valid_nwid "$nwid"; then
+					echo '{"error": "backup does not contain a valid network ID"}'
+					exit 0
+				fi
+				if ! printf '%s' "$backup_json" | jq -e --arg nwid "$nwid" '
+					[.nwid?, .network.id?, .network.nwid?] |
+					map(select(. != null)) |
+					all(.[];
+						type == "string" and
+						ascii_downcase == ($nwid | ascii_downcase)
+					)
+				' >/dev/null 2>&1; then
+					echo '{"error": "backup contains conflicting network IDs"}'
+					exit 0
+				fi
+
+				members_file="$(mktemp /tmp/zerotier-controller-import.XXXXXX)" || {
+					json_error "failed to create temporary import file" POST "/controller/network/$nwid/member" 0
+					exit 0
+				}
+
+				if ! printf '%s' "$backup_json" | jq -c '
+					def valid_nodeid:
+						type == "string" and test("^[0-9a-fA-F]{10}$");
+					if (.members | type) == "object" then
+						.members | to_entries |
+						if all(.[]; (.key | valid_nodeid) and ((.value | type) == "object")) then
+							.[] | { id: .key, config: .value }
+						else
+							error("invalid member entry")
+						end
+					elif (.members | type) == "array" then
+						.members |
+						if all(.[]; (type == "object") and ((.id // .nodeId) | valid_nodeid)) then
+							.[] | { id: (.id // .nodeId), config: . }
+						else
+							error("invalid member entry")
+						end
+					else
+						error("invalid members collection")
+					end
+				' > "$members_file" 2>/dev/null; then
+					rm -f "$members_file"
+					echo '{"error": "backup contains an invalid member entry"}'
+					exit 0
+				fi
+
+				member_count="$(wc -l < "$members_file" | tr -d ' ')"
+				case "$member_count" in *[!0-9]*|'') member_count=0 ;; esac
+
+				controller_status="$(zt_api GET /status)"
+				if has_error "$controller_status"; then
+					rm -f "$members_file"
+					printf '%s\n' "$controller_status"
+					exit 0
+				fi
+				controller_nodeid="$(printf '%s' "$controller_status" | jq -r '
+					.address // empty | if type == "string" then ascii_downcase else empty end
+				')"
+				if ! valid_nodeid "$controller_nodeid"; then
+					rm -f "$members_file"
+					echo '{"error": "controller node ID is unavailable"}'
+					exit 0
+				fi
+
+				if [ "$import_mode" = "restore" ]; then
+					backup_controller_nodeid="$(printf '%.10s' "$nwid" | tr '[:upper:]' '[:lower:]')"
+					if [ "$controller_nodeid" != "$backup_controller_nodeid" ]; then
+						rm -f "$members_file"
+						jq -cn \
+							--arg nwid "$nwid" \
+							--arg controller_nodeid "$controller_nodeid" \
+							'{ error: "backup network ID belongs to a different controller identity, switch the import mode to migrate to import it as a new network", nwid: $nwid, controller_nodeid: $controller_nodeid, restored: false }'
+						exit 0
+					fi
+					create_path="/controller/network/$nwid"
+					net_payload="$net_config"
+				else
+					# Migrate: let this controller assign a fresh network ID and
+					# drop the identity of the foreign network from the payload.
+					create_path="/controller/network/${controller_nodeid}______"
+					net_payload="$(printf '%s' "$net_config" | jq -c 'del(.id, .nwid)')"
+				fi
+
+				network_result="$(zt_api POST "$create_path" "$net_payload")"
+				if has_error "$network_result"; then
+					rm -f "$members_file"
+					printf '%s\n' "$network_result"
+					exit 0
+				fi
+				restored_nwid="$(printf '%s' "$network_result" | jq -r '
+					(.id // .nwid // empty) |
+					if type == "string" then . else empty end
+				')"
+				if [ "$import_mode" = "restore" ]; then
+					if ! valid_nwid "$restored_nwid" ||
+						[ "$(printf '%s' "$restored_nwid" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$nwid" | tr '[:upper:]' '[:lower:]')" ]; then
+						rm -f "$members_file"
+						jq -cn \
+							--arg nwid "$nwid" \
+							--arg returned_nwid "$restored_nwid" \
+							'{ error: "controller did not restore the requested network ID", nwid: $nwid, returned_nwid: $returned_nwid, restored: false }'
+						exit 0
+					fi
+					target_nwid="$nwid"
+				else
+					if ! valid_nwid "$restored_nwid" ||
+						[ "$(printf '%.10s' "$restored_nwid" | tr '[:upper:]' '[:lower:]')" != "$controller_nodeid" ]; then
+						rm -f "$members_file"
+						jq -cn \
+							--arg nwid "$nwid" \
+							--arg returned_nwid "$restored_nwid" \
+							'{ error: "controller did not assign a network ID owned by this controller", nwid: $nwid, returned_nwid: $returned_nwid, restored: false }'
+						exit 0
+					fi
+					target_nwid="$restored_nwid"
+				fi
+
+				restored_members=0
+				while IFS= read -r item; do
+					m_id="$(printf '%s' "$item" | jq -r '.id // empty')"
+					if [ "$import_mode" = "restore" ]; then
+						m_cfg="$(printf '%s' "$item" | jq -c '.config')"
+					else
+						m_cfg="$(printf '%s' "$item" | jq -c '.config | del(.nwid)')"
+					fi
+					member_result="$(zt_api POST "/controller/network/$target_nwid/member/$m_id" "$m_cfg")"
+					if has_error "$member_result"; then
+						rm -f "$members_file"
+						printf '%s' "$member_result" | jq -c \
+							--arg nwid "$target_nwid" \
+							--arg source_nwid "$nwid" \
+							--arg mode "$import_mode" \
+							--arg failed_member "$m_id" \
+							--argjson restored_members "$restored_members" \
+							--argjson total_members "$member_count" \
+							'. + {
+								nwid: $nwid,
+								source_nwid: $source_nwid,
+								mode: $mode,
+								restored: false,
+								failed_member: $failed_member,
+								restored_members: $restored_members,
+								total_members: $total_members
+							}'
+						exit 0
+					fi
+					restored_members=$((restored_members + 1))
+				done < "$members_file"
+				rm -f "$members_file"
+
+				jq -cn \
+					--arg nwid "$target_nwid" \
+					--arg source_nwid "$nwid" \
+					--arg mode "$import_mode" \
+					--argjson restored_members "$restored_members" \
+					'{ nwid: $nwid, source_nwid: $source_nwid, mode: $mode, restored: true, restored_members: $restored_members }'
+				;;
+			*)
+				echo '{"error": "Unknown ubus method"}'
+				;;
+		esac
+		;;
+esac
