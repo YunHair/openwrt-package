@@ -54,7 +54,7 @@ endef
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	#  $(CP) ../LICENSE $(PKG_BUILD_DIR)/LICENSE # 注释掉这行
+	$(CP) ../LICENSE $(PKG_BUILD_DIR)/LICENSE
 endef
 
 define Build/Compile
