@@ -56,7 +56,7 @@ define Package/appfilter/install
 	$(INSTALL_BIN) ./files/rule_manager.lua $(1)/usr/bin/rule_manager
 	$(INSTALL_BIN) ./files/hnat.sh $(1)/usr/bin/hnat.sh
 	$(INSTALL_DATA) ./files/oaf_version $(1)/etc/oaf_version
-	$(INSTALL_DATA) ./files/luci-app-oaf.json $(1)/usr/share/rpcd/acl.d/
+	## $(INSTALL_DATA) ./files/luci-app-oaf.json $(1)/usr/share/rpcd/acl.d/
 endef
 
 
