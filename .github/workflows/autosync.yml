@@ -83,6 +83,7 @@ jobs:
           "https://github.com/laipeng668/luci-app-gecoosac|main|dirs|gecoosac luci-app-gecoosac|"
           "https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|dirs|luci-app-tailscale-community|"
           "https://github.com/kenzok8/small-package|main|dirs|oaf open-app-filter luci-app-oaf wrtbwmon luci-app-wrtbwmon|"
+          # "https://github.com/kenzok8/small-package|main|dirs|open-app-filter|
           "https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
           "https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
           
