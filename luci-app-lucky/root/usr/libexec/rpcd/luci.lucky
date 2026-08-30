@@ -1,0 +1,352 @@
+#!/usr/bin/ucode
+'use strict';
+
+import { readfile, stat, open, popen } from 'fs';
+import { cursor } from 'uci';
+
+const DIR    = '/tmp/lucky_update';
+const SCRIPT = '/usr/libexec/lucky-update.sh';
+const ALOG   = DIR + '/autoupdate.log';
+const SLOG   = DIR + '/lucky-start.log';
+const INIT = '/etc/init.d/lucky';
+
+const SETTINGS = {
+    enabled: '0', port: '16601', safe: '', internet: '0', delay: '60',
+    configdir: '/etc/config/lucky.daji', binpath: '/usr/bin/lucky',
+    arch: 'auto', mirror: 'github', release_type: 'stable', variant: 'lucky',
+    respawn_threshold: '3600', respawn_timeout: '30', respawn_retry: '5',
+    auto_update: '0', update_interval: '7', installed_version: ''
+};
+
+const RESTART_KEYS = [
+    'enabled', 'port', 'safe', 'internet', 'delay',
+    'binpath', 'configdir',
+    'respawn_threshold', 'respawn_timeout', 'respawn_retry'
+];
+
+function sys(c)    { let p = popen(c, 'r'); if (!p) return -1; p.read('all'); return p.close(); }
+function exec(c)   { let p = popen(c, 'r'); let o = p ? p.read('all') : ''; if (p) p.close(); return trim(o ?? ''); }
+function read(p)   { return readfile(p) ?? ''; }
+function exists(p) { return stat(p) != null; }
+function uf(n)     { return `${DIR}/${n}`; }
+
+function ucv(k) {
+    let c = cursor(); c.load('lucky');
+    return c.get('lucky', 'lucky', k) || SETTINGS[k] || '';
+}
+
+function getLuciVersion() {
+    if (exec('command -v apk')) {
+        return exec("apk info luci-app-lucky 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1");
+    }
+    return exec("opkg info luci-app-lucky 2>/dev/null | grep '^Version:' | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1");
+}
+
+function runTask(prefix, state, args) {
+    let sf = uf(prefix + 'status');
+    sys(`mkdir -p '${DIR}' && rm -f '${sf}'`);
+    let f = open(sf, 'w');
+    if (f) { f.write(state); f.close(); }
+    sys(`setsid '${SCRIPT}' ${args} >/dev/null 2>&1 &`);
+    return { result: 'ok' };
+}
+
+function getTaskStatus(prefix, doneTag) {
+    let sf = uf(prefix + 'status');
+    if (!exists(sf)) return { status: 'idle' };
+
+    let st  = trim(read(sf));
+    let log = exists(uf(prefix + 'log'))
+            ? exec(`cat '${uf(prefix + 'log')}' 2>/dev/null`)
+            : '';
+
+    for (let s in ['checking', 'downloading', 'installing'])
+        if (substr(st, 0, length(s)) === s)
+            return { status: s, log };
+
+    if (substr(st, 0, 6) === 'ready:') {
+        let rel = null;
+        try { rel = json(read(uf(prefix + 'releases.json'))); } catch(e) {}
+        return { status: 'ready', count: int(substr(st, 6)), releases: rel, log };
+    }
+
+    let dLen = length(doneTag);
+    if (substr(st, 0, dLen) === doneTag)
+        return { status: 'done', installed: substr(st, dLen), log };
+
+    if (substr(st, 0, 6) === 'error:')
+        return { status: 'error', msg: substr(st, 6), log };
+
+    return { status: 'idle' };
+}
+
+function parseStatFields(raw) {
+    let rp = index(raw, ')');
+    if (rp < 0) return [];
+    let tail = trim(substr(raw, rp + 1));
+    let parts = [];
+    for (let f in split(tail, ' ')) {
+        let t = trim(f);
+        if (length(t) > 0) push(parts, t);
+    }
+    return parts;
+}
+
+function readProcKey(path, key) {
+    let raw = read(path);
+    for (let line in split(raw, '\n')) {
+        if (index(line, key) === 0) {
+            let parts = [];
+            for (let f in split(trim(line), ' ')) {
+                let t = trim(f);
+                if (length(t) > 0) push(parts, t);
+            }
+            return int(parts[1]) || 0;
+        }
+    }
+    return 0;
+}
+
+function readTotalTicks() {
+    let line  = exec('head -1 /proc/stat');
+    let total = 0;
+    let first = true;
+    for (let f in split(trim(line), ' ')) {
+        let t = trim(f);
+        if (!length(t)) continue;
+        if (first) { first = false; continue; }
+        total += int(t) || 0;
+    }
+    return total;
+}
+
+const api = {
+
+    toggle_service: (a) => {
+        let action = a.action || '';
+        if (action !== 'enable' && action !== 'disable' && action !== 'restart')
+            return { result: 'error', msg: 'unknown action' };
+        if (action === 'enable' || action === 'disable') {
+            let u = cursor(); u.load('lucky');
+            u.set('lucky', 'lucky', 'enabled', action === 'enable' ? '1' : '0');
+            u.commit('lucky');
+        }
+        sys(`setsid '${INIT}' restart >/dev/null 2>&1 &`);
+        return { result: 'ok' };
+    },
+
+    get_status: () => {
+        let bin = ucv('binpath');
+        return {
+            running:        length(exec('pidof lucky 2>/dev/null')) > 0,
+            binary_missing: !exists(bin)
+        };
+    },
+
+    get_arch: () => ({ arch: exec(`'${SCRIPT}' detect_arch 2>/dev/null`) }),
+
+    get_system_info: () => {
+        let bin       = ucv('binpath');
+        let configdir = ucv('configdir');
+        let mirror    = ucv('mirror');
+        let variant = ucv('variant');
+        return {
+            version:      ucv('installed_version') || '',
+            luci_version: getLuciVersion() || 'Unknown',
+            variant:      variant,
+            arch:         exec(`'${SCRIPT}' detect_arch 2>/dev/null`),
+            binpath:      bin,
+            configdir:    configdir
+        };
+    },
+
+    get_settings: () => {
+        let u = cursor(), r = {};
+        u.load('lucky');
+        for (let k in SETTINGS) r[k] = u.get('lucky', 'lucky', k) || SETTINGS[k];
+        return r;
+    },
+
+    save_settings: (a) => {
+        let u = cursor(); u.load('lucky');
+        let needRestart = false;
+        for (let k in RESTART_KEYS) {
+            let old = u.get('lucky', 'lucky', k) || SETTINGS[k] || '';
+            if (a[k] !== null && a[k] !== old) { needRestart = true; break; }
+        }
+        for (let k in SETTINGS) {
+            if (a[k] !== null) u.set('lucky', 'lucky', k, a[k]);
+        }
+        u.commit('lucky');
+
+        let cmd = needRestart ? 'restart' : 'reload';
+        sys(`setsid ${INIT} ${cmd} >/dev/null 2>&1 &`);
+        return { result: 'ok' };
+    },
+
+    reset_user: () => {
+        let bin = ucv('binpath'), cfg = ucv('configdir');
+        return { result: sys(`'${bin}' -rResetUser -cd '${cfg}' >/dev/null 2>&1`) === 0 };
+    },
+
+    get_process_stats: () => {
+        let pid = exec('pidof lucky 2>/dev/null');
+        if (!pid || !exists(`/proc/${pid}`))
+            return { pid: null, proc_ticks: 0, total_ticks: 0,
+                     cores: 1, mem_rss: 0, mem_percent: 0,
+                     uptime_seconds: 0, threads: 0, nice: 0 };
+
+        let flds      = parseStatFields(read(`/proc/${pid}/stat`));
+        let utime     = int(flds[11]) || 0;
+        let stime     = int(flds[12]) || 0;
+        let nice      = int(flds[16]) || 0;
+        let threads   = int(flds[17]) || 0;
+        let starttime = int(flds[19]) || 0;
+
+        let totalTicks = readTotalTicks();
+        let cores = int(exec("grep -c '^processor' /proc/cpuinfo 2>/dev/null")) || 1;
+
+        let memRss   = readProcKey(`/proc/${pid}/status`, 'VmRSS:');
+        let memTotal = readProcKey('/proc/meminfo', 'MemTotal:');
+        let memPct   = memTotal > 0
+            ? int(memRss * 10000 / memTotal + 0.5) / 100 : 0;
+
+        let btime = 0;
+        for (let line in split(read('/proc/stat'), '\n')) {
+            if (index(line, 'btime') === 0) {
+                let parts = [];
+                for (let f in split(trim(line), ' ')) {
+                    let t = trim(f);
+                    if (length(t) > 0) push(parts, t);
+                }
+                btime = int(parts[1]) || 0;
+                break;
+            }
+        }
+        let hz         = 100;
+        let startEpoch = btime + int(starttime / hz);
+        let nowEpoch   = int(exec('date +%s')) || 0;
+        let uptimeSec  = nowEpoch > startEpoch ? nowEpoch - startEpoch : 0;
+
+        return {
+            pid:            int(pid),
+            proc_ticks:     utime + stime,
+            total_ticks:    totalTicks,
+            cores:          cores,
+            mem_rss:        memRss,
+            mem_percent:    memPct,
+            uptime_seconds: uptimeSec,
+            threads:        threads,
+            nice:           nice
+        };
+    },
+
+    clean_update: () => {
+        sys(`rm -rf '${DIR}' && mkdir -p '${DIR}'`);
+        return { result: 'ok' };
+    },
+
+    run_update: () => {
+        sys(`setsid '${SCRIPT}' >/dev/null 2>&1 &`);
+        return { result: 'ok' };
+    },
+
+    get_upstream_version: (a) => runTask('', 'checking',
+        `check '${a.mirror       || ucv('mirror')}'` +
+        ` '${a.release_type || ucv('release_type')}'` +
+        ` '${a.variant      || ucv('variant')}'`
+    ),
+
+    do_update: (a) => (a.tag && a.filename)
+        ? runTask('', 'downloading',
+            `download '${a.tag}' '${a.filename}' '${ucv('binpath')}'`)
+        : { result: 'error' },
+
+    get_update_status: () => getTaskStatus('', 'done:'),
+
+    check_luci: () => runTask('luci_', 'checking', 'check_luci'),
+
+    do_update_luci: (a) => (a.tag && a.filename)
+        ? runTask('luci_', 'downloading',
+            `download_luci '${a.tag}' '${a.filename}'`)
+        : { result: 'error' },
+
+    get_luci_update_status: () => getTaskStatus('luci_', 'luci_done:'),
+
+    get_auto_update_log: (a) => {
+        let logfile = (a && a.type === 'run') ? SLOG : ALOG;
+        return {
+            log: exists(logfile) ? read(logfile) : ''
+        };
+    },
+    
+    list_backups: () => {
+        let files = [];
+        let out = exec(`ls -1t '${DIR}'/*.tar.gz 2>/dev/null`);
+        if (!out) return { files: [] };
+        for (let name in split(out, '\n')) {
+            name = trim(name);
+            if (!length(name)) continue;
+            push(files, {
+                name: replace(name, DIR + '/', ''),
+            });
+        }
+        return { files };
+    },
+
+    restore_backup: (a) => {
+        let filename = a.filename || '';
+        if (!length(filename) || index(filename, '/') >= 0)
+            return { result: 'error', msg: 'invalid filename' };
+        let filepath = `${DIR}/${filename}`;
+        if (!exists(filepath))
+            return { result: 'error', msg: 'file not found' };
+        let configdir = ucv('configdir');
+        if (!length(configdir))
+            return { result: 'error', msg: 'configdir not set' };
+        let parent = exec(`dirname '${configdir}'`);
+        let ret = sys(`tar -xzf '${filepath}' -C '${parent}' 2>/dev/null`);
+        if (ret === 0) { sys(`setsid ${INIT} restart >/dev/null 2>&1 &`); }
+        return { result: ret === 0 ? 'ok' : 'error' };
+    },
+    
+};
+
+const SIGS = {
+    get_status:             {},
+    get_arch:               {},
+    get_system_info:        {},
+    get_settings:           {},
+    get_process_stats:      {},
+    reset_user:             {},
+    get_update_status:      {},
+    check_luci:             {},
+    get_luci_update_status: {},
+    get_auto_update_log:    { type: 'String' },
+    run_update:             {},
+    clean_update:           {},
+    save_settings:          {},
+    toggle_service:         { action: 'String' },
+    get_upstream_version:   { mirror: 'String', release_type: 'String', variant: 'String' },
+    do_update:              { tag: 'String', filename: 'String' },
+    do_update_luci:         { tag: 'String', filename: 'String' },
+    list_backups:    {},
+    restore_backup:  { filename: 'String' },
+};
+
+for (let k in SETTINGS) SIGS.save_settings[k] = 'String';
+
+if (ARGV[0] === 'list') {
+    print(sprintf('%J\n', SIGS));
+} else if (ARGV[0] === 'call') {
+    let fn = api[ARGV[1]];
+    if (!fn) {
+        print('{"error":"Unknown method"}\n');
+    } else {
+        let input = json(read('/dev/stdin') ?? '{}') ?? {};
+        try   { print(sprintf('%J\n', fn(input))); }
+        catch (e) { print(sprintf('{"error":"%s"}\n', e)); }
+    }
+} else {
+    exit(1);
+}

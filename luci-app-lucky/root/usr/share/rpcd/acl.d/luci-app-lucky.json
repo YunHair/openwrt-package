@@ -1,0 +1,36 @@
+{
+    "luci-app-lucky": {
+        "description": "Grant access to luci-app-lucky RPC methods",
+        "read": {
+            "ubus": {
+                "luci.lucky": [
+                    "get_status",
+                    "get_arch",
+                    "get_system_info",
+                    "get_settings",
+                    "get_process_stats",
+                    "get_update_status",
+                    "get_luci_update_status",
+                    "get_auto_update_log",
+                    "get_upstream_version",
+                    "list_backups"
+                ]
+            }
+        },
+        "write": {
+            "ubus": {
+                "luci.lucky": [
+                    "save_settings",
+                    "toggle_service",
+                    "reset_user",
+                    "run_update",
+                    "clean_update",
+                    "do_update",
+                    "do_update_luci",
+                    "check_luci",
+                    "restore_backup"
+                ]
+            }
+        }
+    }
+}
