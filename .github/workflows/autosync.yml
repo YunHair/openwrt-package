@@ -2,7 +2,7 @@ name: Sync
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 20 * * *'
   workflow_dispatch:
 
 jobs:
@@ -84,7 +84,8 @@ jobs:
           "https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|dirs|luci-app-tailscale-community|"
           "https://github.com/kenzok8/small-package|main|dirs|oaf luci-app-oaf wrtbwmon luci-app-wrtbwmon|"
           # "https://github.com/kenzok8/small-package|main|dirs|open-app-filter|   # 文件luci-app-oaf.json 有冲突
-          "https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
+          #"https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
+          "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
           "https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
           
           # 示例3: 同步整个仓库
