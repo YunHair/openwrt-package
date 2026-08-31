@@ -85,6 +85,7 @@ jobs:
           "https://github.com/kenzok8/small-package|main|dirs|oaf luci-app-oaf wrtbwmon luci-app-wrtbwmon|"
           # "https://github.com/kenzok8/small-package|main|dirs|open-app-filter|   # 文件luci-app-oaf.json 有冲突
           #"https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
+          "https://github.com/destan19/OpenAppFilter|master|dirs|oaf luci-app-oaf open-app-filter|"
           "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
           "https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
           
