@@ -1,0 +1,283 @@
+#
+# Copyright (c) 2019-2020 P3TERX <https://p3terx.com>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
+# https://github.com/P3TERX/Actions-OpenWrt
+# Description: Build OpenWrt using GitHub Actions
+#
+
+name: OpenWrt-Plugins-Build-x86
+
+on:
+  repository_dispatch:
+    schedule:
+      - cron: "0 0 1 * *"
+  workflow_dispatch:
+    inputs:
+      use_cache:
+        description: '使用 OpenWrt 源码/工具链缓存加速编译（默认开启；关闭则全新构建）'
+        required: false
+        default: true
+        type: boolean
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
+      chosen-os:
+        required: true
+        default: ubuntu-24.04
+        type: choice
+        options:
+          - ubuntu-20.04
+          - ubuntu-22.04
+          - ubuntu-24.04
+permissions:
+  contents: write
+  # 删除 workflow runs 需要 actions: write（GitRML/delete-workflow-runs 依赖）
+  actions: write
+
+env:
+  UPLOAD_PACKAGE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ${{ inputs.chosen-os || 'ubuntu-24.04'}}
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin:
+          - name: luci-app-pushbot
+            repo: https://github.com/zzsj0928/luci-app-pushbot.git
+            op_repo: https://github.com/openwrt/openwrt
+            op_branch: main
+          - name: luci-app-pushbot
+            repo: https://github.com/zzsj0928/luci-app-pushbot.git
+            op_repo: https://github.com/openwrt/openwrt
+            op_branch: openwrt-23.05
+
+    steps:
+      - name: Before freeing up disk space
+        run: |
+          echo "Before freeing up disk space"
+          echo "=============================================================================="
+          df -hT
+          echo "=============================================================================="
+
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          overprovision-lvm: 'true'
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - name: Free up disk space complete
+        run: |
+          echo "Free up disk space complete"
+          echo "=============================================================================="
+          df -hT
+          echo "=============================================================================="
+
+      - name: Initialization environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          CHOSEN_OS: ${{ github.event.inputs.chosen-os }}
+        run: |
+          sudo -E apt -qq update -y
+          #sudo -E apt -qq upgrade -y
+          sudo -E apt -qq install $(curl -fsSL https://raw.githubusercontent.com/zouyq/openwrt-build-action/main/dep/${CHOSEN_OS}) -y
+          sudo timedatectl set-timezone "$TZ"
+
+      - name: Restore OpenWrt cache
+        id: cache
+        uses: actions/cache/restore@v4
+        if: inputs.use_cache == true
+        with:
+          # 缓存整个 openwrt/（源码 + dl 下载 + staging_dir 工具链 +
+          # build_dir 编译缓存），命中后跳过 clone，直接增量编译
+          path: openwrt
+          key: pushbot-openwrt-${{ matrix.plugin.op_branch }}-${{ runner.os }}
+          restore-keys: |
+            pushbot-openwrt-${{ matrix.plugin.op_branch }}-
+
+      - name: Clone source code
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          pwd && df -hT $PWD
+          git clone ${{ matrix.plugin.op_repo }} -b ${{ matrix.plugin.op_branch }} openwrt
+
+      - name: Update and Install feeds
+        run: |
+          cd openwrt
+          ./scripts/feeds update -a 
+          ./scripts/feeds install -a
+
+      - name: Load custom configuration
+        run: |
+          cd openwrt
+          # 缓存命中时 .config / package 源码为上次残留，先清空再写入当前包
+          rm -f .config
+          rm -rf package/${{ matrix.plugin.name }}
+          git clone ${{ matrix.plugin.repo }} package/${{ matrix.plugin.name }}
+          echo CONFIG_TARGET_x86=y >> .config
+          echo CONFIG_TARGET_x86_64=y >> .config
+          echo CONFIG_TARGET_x86_64_DEVICE_generic=y >> .config
+          echo CONFIG_PACKAGE_${{ matrix.plugin.name }}=y >> .config
+          echo CONFIG_PACKAGE_luci-i18n-pushbot-zh-cn=y >> .config
+          echo CONFIG_LUCI_LANG_zh_Hans=y >> .config
+
+      - name: SSH connection to Actions
+        uses: lhotari/action-upterm@v1
+        if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
+        with:
+          limit-access-to-actor: true
+          wait-timeout-minutes: 5
+
+      - name: Download package
+        id: package
+        run: |
+          cd openwrt
+          make defconfig
+          make download -j8
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
+
+      - name: Compile the Package
+        id: compile
+        run: |
+          cd openwrt
+          echo -e "$(nproc) thread compile"
+          make -j$(nproc) || make -j1 V=s
+          echo "status=success" >> $GITHUB_OUTPUT
+          echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+      - name: Check space usage
+        if: (!cancelled())
+        run: |
+          echo "Free up disk space complete"
+          echo "=============================================================================="
+          df -hT
+          echo "=============================================================================="
+
+      - name: Save OpenWrt cache
+        uses: actions/cache/save@v4
+        if: inputs.use_cache == true && success() && steps.cache.outputs.cache-hit != 'true'
+        with:
+          # 首次（缓存未命中）编译成功后保存；之后命中固定 key 不再覆盖，
+          # 工具链/源码随 op_branch 固定复用
+          path: openwrt
+          key: pushbot-openwrt-${{ matrix.plugin.op_branch }}-${{ runner.os }}
+
+      - name: Organize files
+        id: organize
+        if: steps.compile.outputs.status == 'success' && env.UPLOAD_PACKAGE == 'true' && !cancelled()
+        run: |
+          mkdir openwrt/${{ matrix.plugin.name }}-package
+          mv openwrt/bin/packages/*/luci/${{ matrix.plugin.name }}* openwrt/${{ matrix.plugin.name }}-package || true
+          mv openwrt/bin/packages/*/base/${{ matrix.plugin.name }}* openwrt/${{ matrix.plugin.name }}-package || true
+          mv openwrt/bin/packages/*/luci/luci-i18n-pushbot-zh-cn* openwrt/${{ matrix.plugin.name }}-package || true
+          mv openwrt/bin/packages/*/base/luci-i18n-pushbot-zh-cn* openwrt/${{ matrix.plugin.name }}-package || true
+          cd openwrt/${{ matrix.plugin.name }}-package
+          # 检测第一个匹配的包文件的扩展名
+          pkg_file=$(ls ${{ matrix.plugin.name }}* 2>/dev/null | head -n1)
+          if [ -n "$pkg_file" ]; then
+            ext="${pkg_file##*.}"
+            # 统一转为大写便于显示
+            echo "PKG_EXT=$(echo $ext | tr '[:lower:]' '[:upper:]')" >> $GITHUB_ENV
+          else
+            echo "PKG_EXT=UNKNOWN" >> $GITHUB_ENV
+          fi
+          echo "PACKAGE=$PWD" >> $GITHUB_ENV
+          echo "PLUGIN_NAME=${{ matrix.plugin.name }}" >> $GITHUB_ENV
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Upload Package directory
+        uses: actions/upload-artifact@main
+        if: steps.organize.outputs.status == 'success' && !cancelled()
+        with:
+          name: ${{ matrix.plugin.name }}_${{ env.PKG_EXT }}${{ env.FILE_DATE }}
+          path: ${{ env.PACKAGE }}
+
+      - name: Generate release tag
+        id: tag
+        if: steps.organize.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
+        run: |
+          echo "release_tag=$(date +"%Y.%m.%d-%H%M")_x64_${{ env.PKG_EXT }}" >> $GITHUB_OUTPUT
+          touch release.txt
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Upload firmware to release
+        uses: softprops/action-gh-release@v1
+        if: steps.tag.outputs.status == 'success' && !cancelled()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ matrix.plugin.name }}_${{ steps.tag.outputs.release_tag }}
+          body_path: release.txt
+          files: ${{ env.PACKAGE }}/*
+
+      # ── 清理：编译成功后执行 ──────────────────────────
+      # 删除 workflow run 记录（OR 语义）：
+      #   - 总数超过 8 个：删除最旧的（保留最新 8 个）
+      #   - 或 超过 180 天：删除
+      # （GitRML/delete-workflow-runs 是 AND 语义 —— 只删"既超过
+      #   180天又不在最新8个内"的，无法满足"超过8个就删"，故用脚本）
+      - name: Delete workflow runs
+        if: steps.tag.outputs.status == 'success' && !cancelled()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repo="${{ github.repository }}"
+          now=$(date +%s)
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/$repo/actions/runs?per_page=100&status=completed" \
+            > /tmp/runs.json
+          total=$(jq '.workflow_runs | length' /tmp/runs.json)
+          echo "completed runs: $total"
+          self="${{ github.run_id }}"
+          # 跳过自己；索引>=8（最新8个之外）或 年龄>180天 则删
+          jq -r --argjson now "$now" --arg self "$self" '
+            .workflow_runs | to_entries[] |
+            select(.value.id != ($self|tonumber)) |
+            .key as $i |
+            .value.id as $id |
+            (.value.created_at | fromdateiso8601) as $ct |
+            (($now - $ct) / 86400 > 180 or $i >= 8) as $del |
+            if $del then "\($id)" else empty end
+          ' /tmp/runs.json | while read -r rid; do
+            echo "删除 run: $rid"
+            curl -s -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$repo/actions/runs/$rid" \
+              -o /dev/null -w "%{http_code}\n"
+          done
+
+      # 删除超过 20 个的 release（保留最新 20 个）
+      - name: Clean old releases
+        if: steps.tag.outputs.status == 'success' && !cancelled()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 获取当前仓库所有 release，按创建时间倒序，删除第 21 个及之后
+          # 显式指定 --repo（runner 工作目录可能不是 git 仓库根，gh 无法自动推断）
+          echo "=== 列出所有 releases ==="
+          gh release list --repo "${{ github.repository }}" --limit 100 --json tagName,createdAt --jq '.[] | "\(.createdAt) \(.tagName)"' > /tmp/releases.txt
+          total=$(wc -l < /tmp/releases.txt)
+          echo "当前 release 数: $total"
+          if [ "$total" -gt 20 ]; then
+            # 跳过前 20 个（最新），删除其余
+            tail -n +21 /tmp/releases.txt | while read -r line; do
+              tag=$(echo "$line" | cut -d' ' -f2-)
+              echo "删除旧 release: $tag"
+              gh release delete --repo "${{ github.repository }}" "$tag" --yes --cleanup-tag || echo "跳过删除失败: $tag"
+            done
+          else
+            echo "release 数量未超过 20，无需清理"
+          fi

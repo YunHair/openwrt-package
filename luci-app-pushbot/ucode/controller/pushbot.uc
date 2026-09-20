@@ -1,0 +1,711 @@
+// Copyright 2022-2025 tty228 <tty228@yeah.net> zzsj0928
+// Licensed to the public under the Apache License 2.0.
+
+import { popen, open, readfile, access, mkdir, error } from 'fs';
+import { cursor } from 'uci';
+import { translate } from 'luci.core';
+
+/* ── helper: bytes formatting ── */
+function format_bytes(n) {
+	n = +n || 0;
+	if (n > 1073741824) return sprintf("%.2f G", n / 1073741824);
+	if (n > 1048576)  return sprintf("%.2f M", n / 1048576);
+	if (n > 1024)     return sprintf("%.2f K", n / 1024);
+	return sprintf("%d B", n);
+}
+
+/* ── helper: shell-safe quoting ── */
+function sq(s) {
+	return "'" + replace(s, /'/g, "'\\''") + "'";
+}
+
+/* ── helper: uci commit ── */
+function uci_commit(conf) {
+	return system("/sbin/uci -q commit " + conf);
+}
+
+/* 与主程序一致：永久且开启持久化才使用持久文件。 */
+function ip_blacklist_path(timeout, persist) {
+	if (persist == null || persist == "" || persist == "undefined" || persist == "null")
+		persist = "1";
+	return "" + (timeout ?? "") == "0" && "" + persist == "1"
+		? "/usr/bin/pushbot/api/ip_blacklist" : "/tmp/pushbot/ip_blacklist";
+}
+
+return {
+
+	act_status: function() {
+		let f = popen("pgrep -f pushbot/pushbot", "r");
+		let out = "";
+		if (f) { out = f.read("all"); f.close(); }
+		http.prepare_content("application/json");
+		http.write_json({ running: length(out) > 0 });
+	},
+
+	act_client_list: function() {
+		let clients = [];
+		let usage_map = {};
+
+		/* 流量数据源由 shell 脚本统一探测，直接调 usage list 获取数据 */
+		let pf = popen("/usr/bin/pushbot/pushbot usage list 2>/dev/null", "r");
+		if (pf) {
+			for (let line = pf.read("line"); line; line = pf.read("line")) {
+				let m = match(line, /^(\S+)\s+(\S+)/);
+				if (m) usage_map[uc(m[1])] = +m[2] || 0;
+			}
+			pf.close();
+		}
+
+		/* 读取脚本探测的数据源类型 */
+		let traffic_src = "wrtbw";
+		try { let v = readfile("/tmp/pushbot/traffic_source"); if (v && trim(v) === "nlbw") traffic_src = "nlbw"; } catch(e) {}
+
+		let f = open("/tmp/pushbot/ipAddress", "r");
+		if (f) {
+			for (let l = f.read("line"); l; l = f.read("line")) {
+				l = replace(l, /\s+$/, "");
+				if (length(l) > 0) {
+					let m = match(l, /^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/);
+					if (m) {
+						let now = time();
+						let up = +m[4] || 0;
+						let mac = uc(m[2]);
+						push(clients, {
+							ip:       m[1] ?? "",
+							mac:      mac,
+							hostname: m[3] ?? "",
+							uptime:   up ? now - up : 0,
+							usage:    format_bytes(usage_map[mac] ?? 0)
+						});
+					}
+				}
+			}
+			f.close();
+		}
+
+		http.prepare_content("application/json");
+		http.write_json({ src: traffic_src, list: clients });
+	},
+
+	act_send_test: function() {
+		system("/usr/bin/pushbot/pushbot test >/dev/null 2>&1 &");
+		http.prepare_content("application/json");
+		http.write_json({ ok: true });
+	},
+
+	act_send_manual: function() {
+		system("/usr/bin/pushbot/pushbot send >/dev/null 2>&1 &");
+		http.prepare_content("application/json");
+		http.write_json({ ok: true });
+	},
+
+	act_version: function() {
+		let ver = "";
+		/* apk (OpenWrt 24.10+): /lib/apk/db/installed */
+		let f = popen("awk '/^P:luci-app-pushbot$/{f=1;next} f&&/^V:/{print substr($0,3);exit}' /lib/apk/db/installed 2>/dev/null", "r");
+		if (f) { ver = replace(f.read("all"), /\s+/, ""); f.close(); }
+		/* opkg (legacy): /usr/lib/opkg/status */
+		if (ver == "") {
+			f = popen("awk '/^Package: luci-app-pushbot$/{f=1;next} f&&/^Version:/{print $2;exit}' /usr/lib/opkg/status 2>/dev/null", "r");
+			if (f) { ver = replace(f.read("all"), /\s+/, ""); f.close(); }
+		}
+		http.prepare_content("application/json");
+		http.write_json({ version: ver });
+	},
+
+	act_soc_test: function() {
+		system("/usr/bin/pushbot/pushbot soc");
+		http.redirect(dispatcher.build_url("admin", "services", "pushbot"));
+	},
+
+	act_soc_result: function() {
+		let fallback = translate('No output') ?? 'No output';
+		let f = popen("cat /tmp/pushbot/soc_tmp 2>/dev/null || echo '" + fallback + "'", "r");
+		if (f) {
+			http.write(f.read("all"));
+			f.close();
+		}
+	},
+
+	/* 即时获取 IPv4/IPv6（用于 IPv4/IPv6 变更通知的实时预览输出）：
+	 *   type = 4|6, mode = iface|url
+	 *   iface 模式：读指定接口地址；仅私网时输出地址并标注"非公网IP"
+	 *   url 模式：随机起点换列表内其他 URL 最多 3 次，带 --interface 适配多 WAN
+	 * 返回纯文本（获取失败时返回翻译后的失败文案） */
+	act_get_ip: function() {
+		let ip_type = http.formvalue("type") ?? "4";
+		let mode = http.formvalue("mode") ?? "iface";
+		let iface = http.formvalue("iface") ?? "";
+		let urls  = http.formvalue("url")  ?? "";
+
+		http.prepare_content("text/plain; charset=UTF-8");
+
+		/* 接口名只允许安全字符 */
+		iface = replace(iface, /[^A-Za-z0-9_.\-]/g, "");
+
+		/* 私网/链路本地判断 */
+		function is_private(ip) {
+			if (ip_type == "4") {
+				let m = match(ip, /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+				if (!m) return true;
+				let a = +m[1], b = +m[2];
+				if (a == 10) return true;
+				if (a == 172 && b >= 16 && b <= 31) return true;
+				if (a == 192 && b == 168) return true;
+				if (a == 169 && b == 254) return true;  /* link-local */
+				if (a == 127) return true;              /* loopback */
+				if (a == 100 && b >= 64 && b <= 127) return true;  /* CGNAT */
+				return false;
+			}
+			if (match(ip, /^fe80:/i)) return true;       /* link-local */
+			if (match(ip, /^fc/i) || match(ip, /^fd/i)) return true;  /* ULA */
+			if (ip == "::1") return true;
+			return false;
+		}
+
+		function run(cmd) {
+			let f = popen(cmd + " 2>/dev/null", "r");
+			if (f) {
+				let out = f.read("all");
+				f.close();
+				return replace(out, /[\r\n]+$/, "");
+			}
+			return "";
+		}
+
+		let ip = "";
+		if (mode == "iface" && iface != "") {
+			if (ip_type == "4") {
+				ip = run("/sbin/ifconfig " + sq(iface) +
+					" | awk '/inet addr/ {print $2}' | awk -F: '{print $2}'" +
+					" | grep -oE '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}' | head -n1");
+			}
+			else {
+				ip = run("ip addr show " + sq(iface) +
+					" | grep -v deprecated | grep -A1 'inet6 [^f:]'" +
+					" | sed -nr ':a;N;s#^ +inet6 ([a-f0-9:]+)/.+? scope global .*? valid_lft ([0-9]+sec) .*#\\2 \\1#p;ta'" +
+					" | sort -nr | head -n1 | awk '{print $2}'");
+			}
+		}
+		else if (mode == "url") {
+			/* 与脚本 get_hostipv4/get_hostipv6 一致：随机起点，失败换列表内另一个，最多 3 次 */
+			let lines = [];
+			for (let l in split(urls, /\r?\n/)) {
+				let t = replace(l, /\s+/, "");
+				if (length(t) > 0) push(lines, t);
+			}
+			if (length(lines) > 0) {
+				/* 出口策略：显式接口为 LAN(私网) 时走默认路由（如单臂路由），
+				   WAN(公网) 或多 WAN 场景绑定该接口探测 */
+				let bind = "";
+				if (iface != "") {
+					/* 以 OpenWrt 防火墙区域判定 WAN：接口（或所属逻辑接口）出现在
+					   masq=1 的 zone 的 network 列表即视为 WAN。不依赖接口命名
+					   （用户可改名）与 IP 私网/公网。 */
+					let iswan = run("li=''; if uci -q get network." + sq(iface) + " >/dev/null; then li=" + sq(iface) + "; else for i in $(ubus list 'network.interface.*' 2>/dev/null | sed 's/^network[.]interface[.]//'); do d=$(uci -q get network.$i.device); [ \"$d\" = " + sq(iface) + " ] && li=\"$li $i\"; [ -z \"$d\" ] && d=$(uci -q get network.$i.ifname); [ \"$d\" = " + sq(iface) + " ] && li=\"$li $i\"; l3=$(ubus call network.interface.$i status 2>/dev/null | grep -oE '\"l3_device\": \"[^\"]*\"' | head -1 | cut -d'\"' -f4); [ \"$l3\" = " + sq(iface) + " ] && li=\"$li $i\"; done; fi; found=0; for i in $li; do for z in $(seq 0 20); do n=$(uci -q get firewall.@zone[$z].name); [ -z \"$n\" ] && break; m=$(uci -q get firewall.@zone[$z].masq); zn=$(uci -q get firewall.@zone[$z].network); if [ \"$m\" = \"1\" ]; then case \" $zn \" in *\" $i \"*) found=1; break 2;; esac; fi; done; done; echo \"$found\"");
+					if (iswan == "1") bind = " --interface " + sq(iface);
+				}
+				let start = time() % length(lines);
+				for (let i = 0; i < 3 && i < length(lines); i++) {
+					let pick = lines[(start + i) % length(lines)];
+					let out = run("curl -k -s -" + (ip_type == "4" ? "4" : "6") + bind + " -m 8 " + sq(pick) +
+						(ip_type == "4"
+							? " | grep -oE '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}' | head -n1"
+							: " | grep -oE '([\\da-fA-F0-9]{1,4}(:{1,2})){1,15}[\\da-fA-F0-9]{1,4}' | head -n1"));
+					if (out != "") { ip = out; break; }
+				}
+			}
+		}
+
+		if (ip == "") {
+			http.write(translate('Failed to obtain IP') ?? 'Failed to obtain IP');
+			return;
+		}
+		if (is_private(ip)) {
+			let note = translate('Not a public IP') ?? 'Not a public IP';
+			http.write(ip + " (" + note + ")");
+			return;
+		}
+		http.write(ip);
+	},
+
+	get_log: function() {
+		let u = cursor();
+		if (u.get("pushbot", "pushbot", "debuglevel") != "1") {
+			http.write(translate('Logging disabled') ?? 'Logging disabled');
+			return;
+		}
+		let f = open("/tmp/pushbot/pushbot.log", "r");
+		if (f) { http.write(f.read("all")); f.close(); }
+	},
+
+	clear_log: function() {
+		let f = open("/tmp/pushbot/pushbot.log", "w");
+		if (f) { f.write(""); f.close(); }
+	},
+
+	act_restart: function() {
+		system("/etc/init.d/pushbot restart");
+		http.prepare_content("application/json");
+		http.write_json({ ok: true });
+	},
+
+	act_check_firewall: function() {
+		system("/usr/bin/pushbot/pushbot check_firewall >/dev/null 2>&1");
+		http.prepare_content("application/json");
+		http.write_json({ ok: true });
+	},
+
+	act_check_traffic: function() {
+		system("/usr/bin/pushbot/pushbot check_traffic >/dev/null 2>&1");
+		http.prepare_content("application/json");
+		http.write_json({ ok: true });
+	},
+
+	act_check_wireless: function() {
+		system("/usr/bin/pushbot/pushbot check_wireless >/dev/null 2>&1");
+		http.prepare_content("application/json");
+		http.write_json({ ok: true });
+	},
+
+	act_get_config: function() {
+		let u = cursor();
+		let cfg = {};
+		let lists = {};
+		let files = {};
+		let sysinfo = {};
+
+		/* 确保缓存目录存在 */
+		system("mkdir -p /tmp/pushbot");
+
+		/* scalar options */
+		let scalar_opts = [
+			"pushbot_enable","lite_enable","jsonpath","dd_webhook","we_webhook",
+			"pp_token","pp_channel","pp_webhook","pp_topic_enable","pp_topic",
+			"pushdeer_key","pushdeer_srv_enable","pushdeer_srv","fs_webhook",
+			"bark_token","bark_srv_enable","bark_srv","bark_sound",
+			"bark_icon_enable","bark_icon","bark_level","device_name",
+			"sleeptime","oui_data","oui_dir","reset_regularly","debuglevel",
+			"pushbot_sheep","starttime","endtime","dnd_low_range","macmechanism",
+			"pushbot_interface","macmechanism2","crontab","regular_time",
+			"regular_time_2","regular_time_3","interval_time","send_title",
+			"router_status","router_temp","router_wan","client_list",
+			"google_check_count","pushbot_up","pushbot_down","table_format",
+			"ntfy_srv_enable","ntfy_server","ntfy_topic","ntfy_token_enable","ntfy_token","ntfy_priority","gotify_server","gotify_token","gotify_priority",
+			"cpuload_enable","cpuload","temperature_enable","temperature",
+			"client_usage","client_usage_max","client_usage_disturb",
+			"pushbot_ipv4","ipv4_interface","pushbot_ipv6","ipv6_interface",
+			"web_logged","ssh_logged","web_login_failed","ssh_login_failed","wifi_connected","wifi_auth_failed",
+			"login_max_num","web_login_black","ip_black_timeout","ip_black_persist",
+			"up_timeout","down_timeout","timeout_retry_count","thread_num",
+			"soc_code","pve_host","pve_port","err_enable","err_sheep_enable",
+			"network_err_event","system_time_event","autoreboot_time",
+			"network_restart_time","public_ip_event","public_ip_retry_count",
+			"font_title","font_success","font_fail","font_client","font_module"
+		];
+
+		let section = u.get_all("pushbot", "pushbot") ?? {};
+
+		for (let o in scalar_opts) {
+			let v = section[o];
+			if (v != null) cfg[o] = v;
+		}
+
+		/* lite_enable: may be space-separated string or list */
+		let lite_raw = section["lite_enable"];
+		if (type(lite_raw) == 'array' && length(lite_raw) > 0)
+			cfg["lite_enable"] = lite_raw;
+		else if (type(lite_raw) == 'string' && length(lite_raw) > 0)
+			cfg["lite_enable"] = filter(split(lite_raw, /\s+/), v => length(v) > 0);
+
+		/* list options */
+		let list_opts = [
+			"device_aliases","pushbot_whitelist","pushbot_blacklist",
+			"MAC_online_list","MAC_offline_list","ip_white_list",
+			"client_usage_whitelist","err_device_aliases"
+		];
+
+		for (let o in list_opts) {
+			let v = section[o];
+			let t = [];
+			if (type(v) == 'array')
+				for (let item in v)
+					if (item != null && item != "") push(t, item);
+			else if (type(v) == 'string' && v != "")
+				for (let item in split(v, /\s+/))
+					if (length(item) > 0) push(t, item);
+			lists[o] = t;
+		}
+
+		/* files */
+		let file_paths = {
+			diy_json:    "/usr/bin/pushbot/api/diy.json",
+			ipv4_list:   "/usr/bin/pushbot/api/ipv4.list",
+			ipv6_list:   "/usr/bin/pushbot/api/ipv6.list",
+			ip_black_list: ip_blacklist_path(section.ip_black_timeout, section.ip_black_persist)
+		};
+
+		/* 黑名单对账由主进程定时同步（login_send + 主循环），页面加载时不触发
+		   （避免重复执行 add_ip_black，也避免与主进程竞争 nft 锁）。 */
+
+		for (let name, path in file_paths) {
+			try {
+				files[name] = readfile(path) ?? "";
+			}
+			catch {
+				files[name] = "";
+			}
+		}
+
+		/* network interfaces */
+		let ifaces = [];
+		let pf = popen("ls /sys/class/net 2>/dev/null", "r");
+		if (pf) {
+			for (let line = pf.read("line"); line; line = pf.read("line")) {
+				let n = replace(line, /\s+/, "");
+				if (n != "lo" && !match(n, /^ifb/))
+					push(ifaces, n);
+			}
+			pf.close();
+		}
+		sysinfo.ifaces = ifaces;
+
+		/* wireless interfaces detection - 缓存到 /tmp，避免重复探测 */
+		let wifi_ifs = [];
+		let wifi_cache_file = "/tmp/pushbot/wireless_ifs";
+		let wc = open(wifi_cache_file, "r");
+		if (wc) {
+			/* 从缓存读取 */
+			let line = wc.read("line");
+			while (line) {
+				let n = replace(line, /\s+/, "");
+				if (length(n) > 0) push(wifi_ifs, n);
+				line = wc.read("line");
+			}
+			wc.close();
+		} else {
+			/* 缓存不存在，执行探测 */
+			let wifi_seen = {};
+			/* 方式1: iw dev（开源驱动 mac80211） */
+			let wf = popen("iw dev 2>/dev/null | grep Interface | awk '{print $2}'", "r");
+			if (wf) {
+				for (let line = wf.read("line"); line; line = wf.read("line")) {
+					let n = replace(line, /\s+/, "");
+					if (length(n) > 0 && !wifi_seen[n]) { wifi_seen[n] = true; push(wifi_ifs, n); }
+				}
+				wf.close();
+			}
+			/* 方式2: 遍历 /sys/class/net 下带 wireless 的接口（MTK 闭源等 iw 无输出的平台） */
+			let wf2 = popen("ls /sys/class/net/*/wireless 2>/dev/null | sed 's|/sys/class/net/||;s|/wireless||;s/:$//'", "r");
+			if (wf2) {
+				for (let line = wf2.read("line"); line; line = wf2.read("line")) {
+					let n = replace(line, /\s+/, "");
+					if (length(n) > 0 && !wifi_seen[n]) { wifi_seen[n] = true; push(wifi_ifs, n); }
+				}
+				wf2.close();
+			}
+			/* 写入缓存 */
+			let wf = open(wifi_cache_file, "w");
+			if (wf) {
+				for (let iface in wifi_ifs) {
+					wf.write(iface + "\n");
+				}
+				wf.close();
+			}
+		}
+		sysinfo.wifi_ifs = wifi_ifs;
+
+		/* IP hints from arp */
+		let ip_hints = [];
+		let arpf = popen("grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' /proc/net/arp 2>/dev/null", "r");
+		if (arpf) {
+			for (let line = arpf.read("line"); line; line = arpf.read("line")) {
+				let m = match(line, /^(\d+\.\d+\.\d+\.\d+)/);
+				if (m && m[1] != "0.0.0.0" && m[1] != "127.0.0.1")
+					push(ip_hints, m[1]);
+			}
+			arpf.close();
+		}
+		sysinfo.ip_hints = ip_hints;
+
+		/* MAC hints from dhcp leases */
+		let mac_hints = [];
+		let lf = open("/tmp/dhcp.leases", "r");
+		if (lf) {
+			for (let line = lf.read("line"); line; line = lf.read("line")) {
+				let parts = filter(split(line, /\s+/), v => length(v) > 0);
+				if (length(parts) >= 4)
+					push(mac_hints, { m: parts[1], n: parts[3] });
+			}
+			lf.close();
+		}
+		/* also try arp for additional MACs */
+		let arpf2 = popen("grep -E '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+' /proc/net/arp 2>/dev/null", "r");
+		if (arpf2) {
+			for (let line = arpf2.read("line"); line; line = arpf2.read("line")) {
+				let m = match(line, /^(\d+\.\d+\.\d+\.\d+)\s+\S+\s+\S+\s+(\S+)/);
+				if (m && m[2] && m[2] != "0.0.0.0") {
+					let known = false;
+					for (let h in mac_hints)
+						if (h.m == m[2]) { known = true; break; }
+					if (!known)
+						push(mac_hints, { m: m[2], n: "" });
+				}
+			}
+			arpf2.close();
+		}
+		sysinfo.mac_hints = mac_hints;
+
+		/* 防火墙模式（读缓存，由主进程 init_firewall_mode 探测） */
+		let fw_out = popen("cat /tmp/pushbot/firewall_mode 2>/dev/null", "r");
+		let fw_mode = "";
+		if (fw_out) {
+			fw_mode = replace(fw_out.read("line") ?? "", /\s+/, "");
+			fw_out.close();
+		}
+		sysinfo.firewall_mode = fw_mode || "unknown";
+
+		http.prepare_content("application/json");
+		http.write_json({ config: cfg, lists: lists, files: files, system: sysinfo });
+	},
+
+	act_save_config: function() {
+		http.prepare_content("application/json");
+
+		let body;
+		try { body = http.content(); } catch { body = null; }
+		if (!body) {
+			http.write_json({ ok: false, error: "no data" });
+			return;
+		}
+
+		let data;
+		try { data = json(body); } catch { data = null; }
+		if (type(data) != 'object') {
+			http.write_json({ ok: false, error: "invalid json" });
+			return;
+		}
+
+		/* 先合并本次设置再选路径，不依赖 JSON 字段遍历顺序。 */
+		let previous = cursor().get_all("pushbot", "pushbot") ?? {};
+		if ("ip_black_persist" in data) {
+			let p = data.ip_black_persist;
+			if (p == null || p == "" || p == "undefined" || p == "null") p = "1";
+			if (p != "0" && p != "1") {
+				http.write_json({ ok: false, error: "invalid ip_black_persist" });
+				return;
+			}
+			data.ip_black_persist = "" + p;
+		}
+		if ("ip_black_timeout" in data && data.ip_black_timeout != null && type(data.ip_black_timeout) != "string") {
+			http.write_json({ ok: false, error: "invalid ip_black_timeout" });
+			return;
+		}
+		let old_path = ip_blacklist_path(previous.ip_black_timeout, previous.ip_black_persist);
+		/* 只校验编辑过的名单；旧页面不能把到期名单重新写回来。 */
+		if ("ip_black_list_base" in data) {
+			let base = data.ip_black_list_base;
+			delete data.ip_black_list_base;
+			if (type(base) != "object" || type(base.list) != "string" ||
+			    (base.timeout != null && type(base.timeout) != "string") ||
+			    (base.persist != null && type(base.persist) != "string")) {
+				http.write_json({ ok: false, error: "invalid ip_black_list_base" });
+				return;
+			}
+			let current = readfile(old_path);
+			if (current == null) {
+				if (error() == "No such file or directory") current = "";
+				else {
+					http.write_json({ ok: false, error: "cannot read active IP blacklist" });
+					return;
+				}
+			}
+			function members(s) {
+				let seen = {};
+				for (let ip in split(s, /\s+/)) if (ip != "") seen[arrtoip(iptoarr(ip)) ?? ip] = true;
+				return join("\n", sort(keys(seen)));
+			}
+			/* ponytail: 校验与写入之间仍有竞态；严格互斥需统一所有写入入口。 */
+			if (members(current) != members(base.list) ||
+			    (previous.ip_black_timeout ?? null) !== (base.timeout ?? null) ||
+			    (previous.ip_black_persist ?? null) !== (base.persist ?? null)) {
+				http.status(409, "Conflict");
+				http.write_json({ ok: false, error: "IP blacklist changed. Reload the page and try again." });
+				return;
+			}
+		}
+		let new_path = ip_blacklist_path(
+			"ip_black_timeout" in data ? data.ip_black_timeout : previous.ip_black_timeout,
+			"ip_black_persist" in data ? data.ip_black_persist : previous.ip_black_persist);
+		/* 未提交名单而切换路径时，只迁移旧活动名单；空名单也覆盖目标。 */
+		if (!("ip_black_list" in data) && old_path != new_path) {
+			let old_list = readfile(old_path);
+			if (old_list == null) {
+				http.write_json({ ok: false, error: "cannot read active IP blacklist" });
+				return;
+			}
+			data.ip_black_list = old_list;
+		}
+		if ("ip_black_list" in data && type(data.ip_black_list) != "string") {
+			http.write_json({ ok: false, error: "invalid ip_black_list" });
+			return;
+		}
+
+		let file_paths = {
+			diy_json: "/usr/bin/pushbot/api/diy.json",
+			ipv4_list: "/usr/bin/pushbot/api/ipv4.list",
+			ipv6_list: "/usr/bin/pushbot/api/ipv6.list",
+			ip_black_list: new_path
+		};
+
+		/* 先写文件并检查结果；失败时不继续提交配置或启动服务。 */
+		for (let opt, path in file_paths) {
+			if (!(opt in data)) continue;
+			let content = type(data[opt]) == "string" ? data[opt] : "";
+			if (opt == "ip_black_list") {
+				let keep = [];
+				let seen = {};
+				let loc = { "::1": true, "127.0.0.1": true };
+				let pf = popen("ip -o addr show 2>/dev/null | awk '{print $4}' | cut -d/ -f1", "r");
+				if (pf) {
+					for (let line = pf.read("line"); line; line = pf.read("line")) {
+						let a = replace(line, /[\r\n\s]+/, "");
+						if (a != "") loc[a] = true;
+					}
+					pf.close();
+				}
+				for (let p in split(content, /\s+/)) {
+					if (p == "" || (p in loc) || (p in seen)) continue;
+					seen[p] = true;
+					push(keep, p);
+				}
+				content = length(keep) ? join("\n", keep) + "\n" : "";
+				if (path == "/tmp/pushbot/ip_blacklist" && !access("/tmp/pushbot") && !mkdir("/tmp/pushbot")) {
+					http.write_json({ ok: false, error: "cannot create /tmp/pushbot" });
+					return;
+				}
+			}
+			let f = open(path, "w");
+			if (!f) {
+				http.write_json({ ok: false, error: "cannot open " + path });
+				return;
+			}
+			let written = f.write(content);
+			let closed = f.close();
+			if (written !== length(content) || !closed) {
+				http.write_json({ ok: false, error: "cannot write " + path });
+				return;
+			}
+		}
+
+		let list_opt_set = {
+			device_aliases: true,
+			pushbot_whitelist: true,
+			pushbot_blacklist: true,
+			MAC_online_list: true,
+			MAC_offline_list: true,
+			ip_white_list: true,
+			client_usage_whitelist: true,
+			err_device_aliases: true
+		};
+
+		let font_opts = {
+			font_title: true, font_success: true, font_fail: true,
+			font_client: true, font_module: true
+		};
+
+		function uci_cmd(...args) {
+			let cmd = "/sbin/uci -q";
+			for (let a in args)
+				cmd += " " + a;
+			system(cmd);
+		}
+
+		for (let opt, val in data) {
+			if (opt in file_paths) continue;
+			/* color options: only #RRGGBB */
+			if (opt in font_opts) {
+				if (type(val) != 'string' || val == "" || !match(val, /^#[0-9a-fA-F]{6}$/))
+					uci_cmd("delete", "pushbot.pushbot." + sq(opt));
+				else {
+					uci_cmd("delete", "pushbot.pushbot." + sq(opt));
+					uci_cmd("set", "pushbot.pushbot." + sq(opt) + "=" + sq(val));
+				}
+			}
+			/* list options */
+			else if (opt in list_opt_set) {
+				uci_cmd("delete", "pushbot.pushbot." + sq(opt));
+				/* 黑名单保存校验：剔除本机接口地址与 ::1 / 127.0.0.1
+				   （防止误拉黑自己断掉 Web/SSH 访问；脚本侧还有
+				   is_local_address 硬保护，这里保存端提前过滤） */
+				let localset = {};
+				if (opt == "pushbot_blacklist") {
+					localset["::1"] = true;
+					localset["127.0.0.1"] = true;
+					let pf = popen("ip -o addr show 2>/dev/null | awk '{print $4}' | cut -d/ -f1", "r");
+					if (pf) {
+						for (let line = pf.read("line"); line; line = pf.read("line")) {
+							let a = replace(line, /[\r\n\s]+/, "");
+							if (a != "")
+								localset[a] = true;
+						}
+						pf.close();
+					}
+				}
+				function add(v) {
+					if (v == "")
+						return;
+					if (opt == "pushbot_blacklist" && v in localset)
+						return;   /* 本机地址：剔除，不写入配置 */
+					uci_cmd("add_list", "pushbot.pushbot." + sq(opt) + "=" + sq(v));
+				}
+				if (type(val) == 'array')
+					for (let v in val) add(v);
+				else if (type(val) == 'string')
+					add(val);
+			}
+			/* scalar options */
+			else {
+				if (val == null || val == "") {
+					uci_cmd("delete", "pushbot.pushbot." + sq(opt));
+				}
+				else if (type(val) == 'array') {
+					let p = [];
+					for (let v in val)
+						if (v != "") push(p, v);
+					if (length(p) > 0) {
+						uci_cmd("delete", "pushbot.pushbot." + sq(opt));
+						uci_cmd("set", "pushbot.pushbot." + sq(opt) + "=" + sq(join(" ", p)));
+					}
+				}
+				else {
+					uci_cmd("delete", "pushbot.pushbot." + sq(opt));
+					uci_cmd("set", "pushbot.pushbot." + sq(opt) + "=" + sq("" + val));
+				}
+			}
+		}
+		if (uci_commit("pushbot") != 0) {
+			http.write_json({ ok: false, error: "cannot commit pushbot configuration" });
+			return;
+		}
+
+		/* 保存后联动服务状态（避免"config 启用但服务未启动"）：
+		 *   enable=1 → 服务未跑则启动，已在跑则重启使新配置生效
+		 *   enable=0 → 停止服务（配合主脚本 enable_detection 双保险）
+		 *   后台(&)执行，避免阻塞 HTTP 请求导致前端"保存失败" */
+		let u = cursor();
+		let en = u.get("pushbot", "pushbot", "pushbot_enable");
+		if (en == "1" || en == 1 || en == true)
+			system("/etc/init.d/pushbot start >/dev/null 2>&1 &");
+		else if (en == "0" || en == 0 || en == false)
+			system("/etc/init.d/pushbot stop >/dev/null 2>&1 &");
+
+		/* pushbot blacklist 已移除：pushbot start 会重启主进程，
+		   初始化时统一执行 add_ip_black，避免重复同步和重复日志 */
+
+		http.write_json({ ok: true });
+	},
+
+	/* compatibility: index — no-op, menu registration is handled by menu.d JSON */
+	index: function() {}
+};

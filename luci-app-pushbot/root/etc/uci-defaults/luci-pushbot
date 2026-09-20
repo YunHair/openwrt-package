@@ -1,0 +1,12 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@pushbot[-1]
+	add ucitrack pushbot
+	set ucitrack.@pushbot[-1].init=pushbot
+	commit ucitrack
+EOF
+
+rm -rf /tmp/luci-app-pushbot*
+rm -rf /tmp/luci-i18n-pushbot*
+exit 0
