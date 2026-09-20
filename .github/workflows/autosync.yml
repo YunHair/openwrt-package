@@ -95,6 +95,10 @@ jobs:
           "https://github.com/eamonxg/luci-theme-aurora|master|full||luci-theme-aurora"
           "https://github.com/eamonxg/luci-app-aurora-config|master|full||luci-app-aurora-config"
           "https://github.com/UnblockNeteaseMusic/luci-app-unblockneteasemusic|js|full||luci-app-unblockneteasemusic"
+          "https://github.com/zzsj0928/luci-app-pushbot|master|full| |luci-app-pushbot"
+          
+
+          
 
           
           # 示例2: 同步子目录内容到目标目录（适用于 Makefile 在子目录的情况）
