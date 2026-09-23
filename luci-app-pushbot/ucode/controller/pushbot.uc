@@ -709,8 +709,12 @@ return {
 		let en = u.get("pushbot", "pushbot", "pushbot_enable");
 		if (en == "1" || en == 1 || en == true)
 			system("/etc/init.d/pushbot start >/dev/null 2>&1 &");
-		else if (en == "0" || en == 0 || en == false)
+		else if (en == "0" || en == 0 || en == false) {
 			system("/etc/init.d/pushbot stop >/dev/null 2>&1 &");
+			/* 总开关关闭时立即清理 pushbot 定时任务：
+			   否则残留 crontab 的 "pushbot send" 会绕过开关继续推送 */
+			system("crontab -l 2>/dev/null | grep -v pushbot | crontab - 2>/dev/null &");
+		}
 
 		/* pushbot blacklist 已移除：pushbot start 会重启主进程，
 		   初始化时统一执行 add_ip_black，避免重复同步和重复日志 */
@@ -836,7 +840,8 @@ return {
 		if (mgr == "apk") {
 			cmd = "apk add --allow-untrusted /tmp/luci-app-pushbot-*.apk /tmp/luci-i18n-pushbot-*.apk";
 		} else {
-			cmd = "opkg install /tmp/luci-app-pushbot_*.ipk /tmp/luci-i18n-pushbot_*.ipk";
+			/* opkg 同版本会 up to date 跳过，需 --force-reinstall 覆盖 */
+			cmd = "opkg install --force-reinstall /tmp/luci-app-pushbot_*.ipk /tmp/luci-i18n-pushbot-zh-cn_*.ipk";
 		}
 
 		/* run install in background, log output */
