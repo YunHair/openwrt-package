@@ -34,9 +34,10 @@ function mkSelect(id, opts, cur, onChange) {
 
 function buildInfoGrid() {
     var items = [
-        [_('Lucky Version'), 'ii_ver'],  [_('LuCI Version'), 'ii_luci'],
-        [_('Variant'),       'ii_var'],  [_('Architecture'), 'ii_arch'],
-        [_('Binary Path'),   'ii_bin'],  [_('Data Dir'),     'ii_cfg']
+        [_('Lucky Version'), 'ii_ver'],  [_('Release Tag'), 'ii_tag'],
+        [_('LuCI Version'),  'ii_luci'], [_('Variant'),     'ii_var'],
+        [_('Architecture'),  'ii_arch'], [_('Build Date'),  'ii_build'],
+        [_('Binary Path'),   'ii_bin'],  [_('Data Dir'),    'ii_cfg']
     ];
     return C.buildCard(_('Current Installation'),
         C.buildInfoTiles(items, 150, true), { icon: 'info' });
@@ -64,8 +65,13 @@ function buildRetryRow(self) {
                 ], r)
             ]),
             mkSelect('upd_rvar', [
-                { v: 'lucky', l: _('Standard (lucky)') },
-                { v: 'wanji', l: _('Full-featured (wanji)') }
+                { v: 'lucky',        l: _('Standard Edition (Lucky)') },
+                { v: 'wanji',        l: _('Full-featured Edition (Wanji)') },
+                { v: 'xiaojv',       l: _('Basic Lite (XiaoJV)') },
+                { v: 'xiaojv_waf',   l: _('Lite + WAF (XiaoJV WAF)') },
+                { v: 'xiaoman',      l: _('Wanji Lite (xiaoman)') },
+                { v: 'lucky_docker', l: _('Lucky Docker Edition') },
+                { v: 'wanji_docker', l: _('Wanji Docker Edition') }
             ], v),
             E('button', {
                 type: 'button',
@@ -91,7 +97,7 @@ function buildUpdateSection(t, title, iconKey, chkLabel, self, extraEl) {
         extraEl || '',
         E('div', { id: t + '_sels', class: 'lucky-sels', style: 'display:none;' }, [
             E('label', { class: 'lucky-inline-label' }, _('Version:')),
-            E('select', { id: t + '_tag', class: 'lucky-select lucky-select--tag' }),
+            E('select', { id: t + '_tag', class: 'lucky-select lucky-select--tag', change: function() { self._sel(t); } }),
             E('label', { class: 'lucky-inline-label' }, _('File:')),
             E('select', { id: t + '_file', class: 'lucky-select lucky-select--file' }),
             E('button', {
@@ -322,8 +328,14 @@ return view.extend({
         if (t === 'upd') {
             var variant = ucig('variant') || 'lucky';
             files = files.filter(function(f) {
-                var isWanji = f.name.indexOf('wanji') !== -1;
-                return variant === 'wanji' ? isWanji : !isWanji;
+                var n = f.name;
+                if (variant === 'wanji')        return n.indexOf('wanji') !== -1 && n.indexOf('docker') === -1;
+                if (variant === 'xiaojv')       return n.indexOf('xiaojv') !== -1 && n.indexOf('waf') === -1;
+                if (variant === 'xiaojv_waf')   return n.indexOf('xiaojv_waf') !== -1;
+                if (variant === 'xiaoman')      return n.indexOf('xiaoman') !== -1;
+                if (variant === 'lucky_docker') return n.indexOf('lucky_docker') !== -1 || (n.indexOf('docker') !== -1 && n.indexOf('wanji') === -1);
+                if (variant === 'wanji_docker') return n.indexOf('wanji_docker') !== -1 || (n.indexOf('wanji') !== -1 && n.indexOf('docker') !== -1);
+                return n.indexOf('wanji') === -1 && n.indexOf('xiaojv') === -1 && n.indexOf('xiaoman') === -1 && n.indexOf('docker') === -1;
             });
         }
         var best = 0;
@@ -338,12 +350,14 @@ return view.extend({
         L.resolveDefault(api.info(), {}).then(function(s) {
             if (!s) return;
             [
-                ['ii_ver',  s.version      ],
-                ['ii_luci', s.luci_version ],
-                ['ii_var',  s.variant      ],
-                ['ii_arch', s.arch         ],
-                ['ii_bin',  s.binpath      ],
-                ['ii_cfg',  s.configdir    ]
+                ['ii_ver',   s.version      ],
+                ['ii_tag',   s.release_tag  ],
+                ['ii_luci',  s.luci_version ],
+                ['ii_var',   s.variant      ],
+                ['ii_arch',  s.arch         ],
+                ['ii_build', s.build_date   ],
+                ['ii_bin',   s.binpath      ],
+                ['ii_cfg',   s.configdir    ]
             ].forEach(function(kv) {
                 var e = $(kv[0]);
                 if (!e) return;
@@ -353,4 +367,5 @@ return view.extend({
         });
     }
 });
+
 
