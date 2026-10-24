@@ -88,7 +88,7 @@ jobs:
           "https://github.com/destan19/OpenAppFilter|master|dirs|oaf luci-app-oaf open-app-filter|"
           "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
           #"https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
-          "https://github.com/kiddin9/openwrt-gately|main|dirs|gately luci-app-gately|
+          "https://github.com/kiddin9/openwrt-gately|main|dirs|gately luci-app-gately|"
 
 
           
