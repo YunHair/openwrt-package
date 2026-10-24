@@ -88,6 +88,9 @@ jobs:
           "https://github.com/destan19/OpenAppFilter|master|dirs|oaf luci-app-oaf open-app-filter|"
           "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
           "https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
+          "https://github.com/kiddin9/openwrt-gately|main|dirs|gately luci-app-gately|
+
+
           
           # 示例3: 同步整个仓库
           "https://github.com/sirpdboy/luci-app-advancedplus|main|full| |luci-app-advancedplus"
