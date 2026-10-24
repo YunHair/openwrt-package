@@ -81,13 +81,13 @@ jobs:
           # 示例1: 同步多个目录（从同一仓库）
           "https://github.com/VIKINGYFY/packages|main|dirs|luci-app-wolultra|"
           "https://github.com/laipeng668/luci-app-gecoosac|main|dirs|gecoosac luci-app-gecoosac|"
-          "https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|dirs|luci-app-tailscale-community|"
+          "https://github.com/kiddin9/op-packages|main|dirs|luci-app-tailscale-community|"
           "https://github.com/kenzok8/small-package|main|dirs|wrtbwmon luci-app-wrtbwmon|"
           # "https://github.com/kenzok8/small-package|main|dirs|open-app-filter|   # 文件luci-app-oaf.json 有冲突
           #"https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
           "https://github.com/destan19/OpenAppFilter|master|dirs|oaf luci-app-oaf open-app-filter|"
           "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
-          "https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
+          #"https://github.com/whzhni1/luci-app-tailscale|main|dirs|tailscale luci-app-tailscale|"
           "https://github.com/kiddin9/openwrt-gately|main|dirs|gately luci-app-gately|
 
 
