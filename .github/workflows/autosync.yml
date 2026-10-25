@@ -81,7 +81,7 @@ jobs:
           # 示例1: 同步多个目录（从同一仓库）
           "https://github.com/VIKINGYFY/packages|main|dirs|luci-app-wolultra|"
           "https://github.com/laipeng668/luci-app-gecoosac|main|dirs|gecoosac luci-app-gecoosac|"
-          "https://github.com/kiddin9/op-packages|main|dirs| gately luci-app-gately|"
+          "https://github.com/kiddin9/op-packages|main|dirs|luci-app-podman gately luci-app-gately|"
           "https://github.com/kenzok8/small-package|main|dirs|wrtbwmon luci-app-wrtbwmon|"
           #"https://github.com/kenzok8/small-package|main|dirs|open-app-filter|"  # 文件luci-app-oaf.json 有冲突         
           #"https://github.com/gdy666/luci-app-lucky|main|dirs|lucky luci-app-lucky|"
