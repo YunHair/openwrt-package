@@ -347,34 +347,7 @@ jobs:
         find . -type d -path "*/openwrt/*" -name "usteer-ng" 2>/dev/null | while read -r dir; do
           echo "⚠️  Found nested directory: $dir"
         done
-
-    - name: Fix gecoosac LICENSE path
-      run: |
-        PKG_DIR="gecoosac"
-
-        [ -f "$PKG_DIR/Makefile" ] || exit 0
-        grep -q '\.\./LICENSE' "$PKG_DIR/Makefile" || exit 0
-
-        echo "🔧 Patching gecoosac LICENSE reference..."
-        # 上游 gecoosac/Makefile 用 $(CP) ../LICENSE，但本仓库只同步了包目录、
-        # 根目录没有 LICENSE，编译 prepare 阶段会 cp: cannot stat '../LICENSE' 失败。
-        # 这里补一份 LICENSE 并改成相对包目录引用，避免每次同步后构建又挂。
-        printf '%s\n' \
-          'GNU Affero General Public License v3.0 only' \
-          '' \
-          'The gecoosac package in this directory is distributed under the GNU' \
-          'Affero General Public License version 3 only.' \
-          '' \
-          'SPDX-License-Identifier: AGPL-3.0-only' \
-          '' \
-          'Canonical license text:' \
-          'https://www.gnu.org/licenses/agpl-3.0.txt' > "$PKG_DIR/LICENSE"
-
-        sed -i 's#\$(CP) \.\./LICENSE#$(CP) ./LICENSE#' "$PKG_DIR/Makefile"
-        echo "✅ gecoosac/LICENSE fixed"
-        grep -n "LICENSE" "$PKG_DIR/Makefile"
-        wc -c "$PKG_DIR/LICENSE"
-
+    
     - name: Commit and push changes
       run: |
         git config user.name "github-actions[bot]"
