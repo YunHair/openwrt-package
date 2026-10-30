@@ -1,0 +1,247 @@
+name: Build
+
+# Two trigger paths, both of which build and publish:
+#   - workflow_dispatch: manual run from the Actions tab.  It takes no
+#     input: the version comes from the Makefile, so there is nothing to
+#     keep in sync by hand and no way to type it wrong.
+#   - push of a v* tag: same build, plus the tag is required to agree with
+#     the Makefile version, so a mistyped tag cannot publish a mismatched
+#     release.
+#
+# Either path uploads the apk/ipk packages as workflow artifacts and
+# attaches them to the GitHub release tagged v<PKG_VERSION>-r<PKG_RELEASE>.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  # Event name in the group, same reason as arch-test.yml: a manual dispatch and
+  # a tag push share github.ref, so without it a rebuild would silently cancel
+  # an in-flight release (or a release would cancel a manual build) and leave a
+  # red X on a commit whose real gate had already passed.  A newer build of the
+  # SAME kind still supersedes the older one, which is what this is for.
+  group: build-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  APK_TOOLS_REF: 'b5a31c0d865342ad80be10d68f1bb3d3ad9b0866'
+
+jobs:
+  # The release gate.  A tag used to publish binaries from a commit the test
+  # suite had never run on - build.yml triggered on tags and workflow_dispatch
+  # while arch-test.yml only ran on push-to-main and pull requests, and the two
+  # pipelines were independent.  Calling the suite here makes the release depend
+  # on it, and reuses the definition instead of duplicating its steps (which is
+  # how the two would drift apart).
+  test:
+    uses: ./.github/workflows/arch-test.yml
+
+  build:
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0   # build-pkg.sh 的 git describe/rev-parse 兜底需要完整历史
+
+      # 发布前确认新增文案已同步进 zh_Hans（豁免项见 tests/i18n-ignore.txt）
+      - name: Check zh_Hans translation coverage
+        # Deliberately a warning here: packaging a release should not be
+        # blocked by a translation gap, and the PR gate (i18n.yml, arch-test)
+        # already fails on one.  This step is here to record the number.
+        run: python3 tests/i18n-coverage.py --warn-below 100
+
+      - name: Cache apk-tools binary
+        id: cache-apk-tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: /usr/local/bin/apk
+          key: apk-tools-${{ env.APK_TOOLS_REF }}-${{ runner.os }}
+
+      - name: Checkout apk-tools
+        if: steps.cache-apk-tools.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: 'alpinelinux/apk-tools'
+          path: 'apk-tools'
+          fetch-depth: 0
+          ref: ${{ env.APK_TOOLS_REF }}
+
+      - name: Checkout po2lmo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: 'openwrt/luci'
+          path: 'po2lmo'
+          sparse-checkout: 'modules/luci-base/src'
+
+      - name: Setup dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get update -qq
+          sudo -E apt-get install -y build-essential curl fakeroot libssl-dev lua5.1 meson ninja-build
+
+          if [ "${{ steps.cache-apk-tools.outputs.cache-hit }}" != "true" ]; then
+            pushd apk-tools
+            meson setup build \
+              -Db_lto=true \
+              -Dcompressed-help=false \
+              -Ddocs=disabled \
+              -Dhelp=enabled \
+              -Dlua_version=5.1 \
+              -Ddefault_library=static \
+              -Durl_backend=wget \
+              -Dzstd=false \
+              -Dpython=disabled \
+              -Dtests=disabled \
+              -Dcrypto_backend=openssl
+            ninja -C build
+            sudo -E meson install -C build --strip
+            popd
+          else
+            echo "apk-tools 缓存命中，跳过编译"
+          fi
+
+          pushd po2lmo/modules/luci-base/src
+          make po2lmo
+          sudo -E install -m0755 -s po2lmo /usr/local/bin/po2lmo
+          popd
+
+          # Pinned to a commit, not to master: this runs in the release job,
+          # which has contents: write and a GH_TOKEN, so a moved master there
+          # would be arbitrary code execution.
+          curl -fLo ipkg-build "https://raw.githubusercontent.com/openwrt/openwrt/c618c6a353f2adafab4c182224739d3687896e49/scripts/ipkg-build"
+          sudo install -m0755 ipkg-build /usr/local/bin/ipkg-build
+
+      - name: Verify toolchain
+        run: |
+          command -v apk >/dev/null || { echo "::error::apk 未正确安装"; exit 1; }
+          command -v po2lmo >/dev/null || { echo "::error::po2lmo 未正确安装"; exit 1; }
+          command -v ipkg-build >/dev/null || { echo "::error::ipkg-build 未正确安装"; exit 1; }
+          apk --version
+
+      - name: Build packages (apk + ipk)
+        run: |
+          # 两条触发路径都是发布构建，所以固定传 release；build-pkg.sh 只
+          # 在 Makefile 缺少 PKG_VERSION 时才用它选兜底版本（当前有值）。
+          fakeroot bash .github/build-pkg.sh apk release
+          fakeroot bash .github/build-pkg.sh ipk release
+          shopt -s nullglob
+          apks=(.github/*.apk)
+          ipks=(.github/*.ipk)
+          if [ "${#apks[@]}" -eq 0 ] || [ "${#ipks[@]}" -eq 0 ]; then
+            echo "::error::未生成预期的 apk/ipk 文件"
+            exit 1
+          fi
+          printf '生成的包:\n%s\n' "${apks[@]}" "${ipks[@]}"
+
+      # apk-tools v3 只认 ADB 容器格式（v2 的 gzip 包会被拒）。让 apk 自己
+      # 解一遍每个包，格式/元数据不合规在这里就失败，而不是等到设备上
+      # apk add 才发现。
+      - name: Validate apk packages (apk-tools v3)
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(.github/*.apk)
+          echo "apk-tools: $(apk --version)"
+          for f in "${apks[@]}"; do
+            echo "== $f"
+            if [ "$(head -c 3 "$f")" != "ADB" ]; then
+              echo "::error::$f 不是 apk v3 (ADB) 格式"
+              exit 1
+            fi
+            # `apk manifest` reads the *installed* database (app_manifest.c
+            # still carries the "TODO: support package files as well"), so on
+            # a package file it only says "Failed to open apk database".
+            # adbdump is the applet that takes .apk arguments.
+            dump="$RUNNER_TEMP/$(basename "$f").dump"
+            apk adbdump "$f" > "$dump"
+            head -15 "$dump"
+            echo "   ADB 容器与元数据可解析"
+          done
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: homeproxy-packages
+          include-hidden-files: true
+          path: |
+            .github/*.apk
+            .github/*.ipk
+
+      # ========== 发布（手动触发与 tag push 都会执行）==========
+      # 瀑布流策略：每个版本一个独立 tag/release。
+
+      - name: Derive and validate release version
+        # 版本只有一个来源：Makefile 的 PKG_VERSION + PKG_RELEASE。这样产物
+        # 文件名、tag 与 release 标题不可能互相错位，手动触发时也没有需要
+        # 手工对齐的输入框。tag push 时额外要求 tag 与 Makefile 相符，避免
+        # 打错 tag 而发布出一个版本对不上的 release。
+        run: |
+          set -euo pipefail
+          MK_V="$(sed -n 's/^PKG_VERSION:=//p' Makefile)"
+          MK_R="$(sed -n 's/^PKG_RELEASE:=//p' Makefile)"
+          EXPECTED="${MK_V}-r${MK_R}"
+          # apk-tools v3 合法版本 + 命名约束：仅数字/点/字母与结尾 -r<数字>（无 _、无 ~）
+          if [[ ! "$EXPECTED" =~ ^[0-9][0-9A-Za-z.]*-r[0-9]+$ ]]; then
+            echo "::error::Makefile 版本 $EXPECTED 非法（期望形如 28.9.1.14-r2，不允许下划线与波浪号）"
+            exit 1
+          fi
+          # 等位编号：把 -rN 规范为 -rNN（如 r2 -> r02），使 GitHub 按 tag
+          # 字符串排序时 r02 < r10 < r11，Release 列表保持从大到小。
+          # 10# 前缀让 bash 按十进制解析前导零，否则 r08/r09 会被当成八进制。
+          canon() {
+            printf '%s-r%02d' "${1%-r*}" "$((10#${1##*-r}))"
+          }
+          TAG_VERSION="$(canon "$EXPECTED")"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            ON_TAG="${GITHUB_REF_NAME#v}"
+            if [[ ! "$ON_TAG" =~ ^[0-9][0-9A-Za-z.]*-r[0-9]+$ ]]; then
+              echo "::error::tag v$ON_TAG 格式非法（期望形如 v28.9.1.14-r02）"
+              exit 1
+            fi
+            if [ "$(canon "$ON_TAG")" != "$TAG_VERSION" ]; then
+              echo "::error::tag v$ON_TAG 与 Makefile 产物版本 $EXPECTED 不一致，拒绝发布"
+              exit 1
+            fi
+          fi
+          echo "VERSION=$EXPECTED" >> "$GITHUB_ENV"
+          echo "TAG_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+          echo "发布版本 v$TAG_VERSION（包内版本 $EXPECTED）"
+
+      - name: Publish release (replacing an existing one if present)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(.github/luci-app-homeproxy-*.apk .github/luci-i18n-homeproxy-*.apk)
+          ipks=(.github/luci-app-homeproxy-*.ipk .github/luci-i18n-homeproxy-*.ipk)
+          if [ "${#apks[@]}" -eq 0 ] || [ "${#ipks[@]}" -eq 0 ]; then
+            echo "::error::找不到待上传的 apk/ipk"
+            exit 1
+          fi
+          # shields.io badge：label 与 message 中 "-" 需写作 "--"（path 分隔转义）
+          LABEL="luci--app--homeproxy"
+          MSG="v${TAG_VERSION//-/--}"
+          NOTES="[![v$TAG_VERSION](https://img.shields.io/badge/${LABEL}-${MSG}-blue)](https://github.com/$GITHUB_REPOSITORY/releases/tag/v$TAG_VERSION)"
+          # 同名 tag/release 视为重新发布：先移除旧的（连同 tag），再由下面的 create 重建
+          if gh release view "v$TAG_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "已存在 v$TAG_VERSION，先删除后重新发布"
+            gh release delete "v$TAG_VERSION" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          elif gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$TAG_VERSION" >/dev/null 2>&1; then
+            # 上一次跑到 create 之前失败时 tag 可能已存在，而 gh release create
+            # 会因 tag 重复而拒绝。清掉这个孤儿 tag，重跑即可自愈。
+            echo "已存在孤儿 tag v$TAG_VERSION，先删除后重新发布"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/v$TAG_VERSION"
+          fi
+          gh release create "v$TAG_VERSION" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "v$TAG_VERSION" \
+            --notes "$NOTES" \
+            "${apks[@]}" "${ipks[@]}"

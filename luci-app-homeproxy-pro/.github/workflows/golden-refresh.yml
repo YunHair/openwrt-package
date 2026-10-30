@@ -1,0 +1,128 @@
+name: Refresh golden fixtures
+
+# Regenerate the repo's golden fixtures on Linux and upload them as an
+# artifact.
+#
+# WHY THIS EXISTS
+#
+# Two fixtures are generated, not hand-written:
+#
+#   tests/fixtures/runtime/trace.golden.txt   the orchestration trace, produced
+#                                             by test_runtime_extraction.sh
+#   tests/snapshots/{node,client,server}.json the LuCI form dumps
+#
+# The form snapshots regenerate anywhere Node runs (`node tests/luci-form-snapshot.js`),
+# so this workflow does not need to produce them.  The *trace* is different:
+# regenerating it needs a Linux host with a real /bin/sh (dash), the ucode
+# toolchain and /bin/sing-box stubs, and the project's own rule forbids
+# building any of that on a developer machine - the whole 2026-09-26 lesson was
+# that a macOS-side "passing" suite does not predict the CI one.
+#
+# So the maintainer has three options when the trace legitimately changes:
+#
+#   1. read the diff CI already prints and hand-edit the golden   (error-prone
+#      for anything beyond a one-line insertion - an off-by-one in the file
+#      ordering produced a patch that did not apply)
+#   2. run the Mac-side toolchain                                   (forbidden)
+#   3. run this workflow                                            <-- here
+#
+# The workflow does NOT commit.  It uploads the regenerated file as an
+# artifact so a human reviews the diff and commits it deliberately: a golden
+# that rewrites itself on CI would silently accept any orchestration change,
+# which is exactly the property the fixture exists to prevent.
+#
+# HOW TO USE
+#
+#   1. gh workflow run golden-refresh.yml
+#   2. gh run download <run-id> -n golden-trace
+#   3. cp trace.golden.txt tests/fixtures/runtime/trace.golden.txt
+#   4. git diff tests/fixtures/runtime/trace.golden.txt   # review every line
+#   5. commit
+#
+# Manual only.  A push-triggered refresh would make the golden a moving target
+# and defeat the comparison in test_runtime_extraction.sh.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: golden-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout source tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Install host build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get update -qq
+          sudo -E apt-get install -y --no-install-recommends \
+            build-essential ca-certificates cmake curl gettext git \
+            libjson-c-dev libmd-dev libssl-dev meson ninja-build \
+            pkg-config python3 zlib1g-dev
+
+      - name: Restore ucode toolchain cache
+        id: cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.local/ucode-testbed
+          key: ${{ runner.os }}-ucode-testbed-${{ hashFiles('tests/toolchain/build-ucode-linux.sh') }}
+
+      - name: Build ucode toolchain (cache miss only)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sh tests/toolchain/build-ucode-linux.sh
+
+      - name: Verify the toolchain is usable
+        run: |
+          test -x "$HOME/.local/ucode-testbed/bin/ucode" || {
+            echo "::error title=Toolchain missing::no ucode in $HOME/.local/ucode-testbed/bin"
+            exit 1
+          }
+          "$HOME/.local/ucode-testbed/bin/ucode" -e 'printf("ucode %s\n", ARGV[0] ?? "ok");'
+
+      - name: Regenerate the orchestration trace golden
+        # HP_UPDATE_GOLDEN=1 makes test_runtime_extraction.sh write the new
+        # trace over the golden instead of comparing.  The script still exits 0,
+        # so the only signal that something was regenerated is the artifact
+        # below - which is why the workflow uploads it rather than committing.
+        env:
+          HP_VALIDATE_DATA: ${{ github.workspace }}/tests/toolchain/validate-data.sh
+        run: |
+          export PATH="$HOME/.local/ucode-testbed/bin:$PATH"
+          HP_UPDATE_GOLDEN=1 sh tests/runtime/test_runtime_extraction.sh .
+
+          # The script writes the file in place; copy it out so the artifact
+          # step has a stable name.
+          cp tests/fixtures/runtime/trace.golden.txt "$RUNNER_TEMP/trace.golden.txt"
+
+          echo "regenerated trace: $(wc -l < "$RUNNER_TEMP/trace.golden.txt") lines"
+
+      - name: Show the diff against the committed golden
+        run: |
+          # Printed into the job log as well as the artifact: a reviewer can
+          # often tell "expected" from "suspicious" from the log alone.
+          if git diff --quiet -- tests/fixtures/runtime/trace.golden.txt; then
+            echo "no change: the committed golden already matches"
+          else
+            echo "=== golden diff (committed -> regenerated) ==="
+            git diff -U3 -- tests/fixtures/runtime/trace.golden.txt
+          fi
+
+      - name: Upload the regenerated golden
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: golden-trace
+          path: ${{ runner.temp }}/trace.golden.txt
+          if-no-files-found: error
+          retention-days: 30

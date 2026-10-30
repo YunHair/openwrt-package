@@ -1,0 +1,192 @@
+name: Architecture test
+
+# Runs the off-target tests that do not need an OpenWrt device:
+# the LuCI form snapshots, the i18n coverage, the ucode parser /
+# domain-model / generator regression / architecture equivalence
+# / subscription filter+decoder+repository suites.
+#
+# The test_generators.sh cases feed the generated config to
+# `sing-box check`, so the workflow installs sing-box 1.14. The
+# ucode + uci/ubus/uloop/lucihttp pieces come from
+# tests/toolchain/build-ucode-linux.sh; without them the
+# subscription repository integration test (and the domain-model
+# skeleton's cursor() walk) would not load.
+#
+# PR + push-to-main so a regression in the Adapter, the Loader,
+# or the generator paths lands caught in the PR view rather
+# than only on a manual workflow_dispatch.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # Also callable, so build.yml can make the release depend on this suite
+  # instead of re-implementing it.  Before that, tagging published binaries from
+  # a commit the tests had never run on: build.yml's only check was the
+  # warn-only translation one, and branch protection is not available on this
+  # repository (the API returns 403 on a private repo without Pro).
+  workflow_call:
+
+concurrency:
+  # The event name is part of the group on purpose.  build.yml calls this
+  # workflow (needs: [test]) to make a release depend on the suite, and a
+  # push to main triggers it too - with the SAME github.ref, so they collided
+  # in one group and cancel-in-progress killed whichever started second.  A
+  # release built that way showed a red X on an otherwise green commit: the
+  # build's own `test / arch-test` had run to completion, but the
+  # push-triggered one sitting in the same group was cancelled 17 seconds in.
+  # That is noise, not a quality signal, and it hides real failures.  Keying on
+  # the event keeps the two apart, so a push still supersedes an older push and
+  # a rebuild still supersedes an older rebuild.
+  group: arch-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  arch-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout source tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Install host build dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get update -qq
+          # gettext supplies msguniq, which luci's i18n-scan.pl calls; the
+          # "translation template is current" step regenerates the template
+          # and needs it. Without it the step fails with "exec of msguniq -s
+          # failed", which looks like a stale template but is a missing tool.
+          sudo -E apt-get install -y --no-install-recommends \
+            build-essential ca-certificates cmake curl gettext git \
+            libjson-c-dev libmd-dev libssl-dev meson ninja-build \
+            pkg-config python3 zlib1g-dev
+
+        # The script installs into $HOME/.local/ucode-testbed by default and
+        # prints the PATH setup we need below. It also verifies the modules
+        # and the lucihttp binding before exiting, so a broken build fails
+        # here rather than halfway through the test suite.
+        #
+        # Review M4: a toolchain rebuild is the slow part of the suite
+        # (several minutes on a hosted runner).  The build script does not
+        # have a skip-if-up-to-date step, so we wrap it in actions/cache:
+        # the cache key is the script's own hash, which already covers the
+        # only two things that can invalidate the build (UCODE_REV and
+        # SINGBOX_VERSION both live in the script).  A cache hit skips the
+        # build step entirely; a miss runs it, and the cache action stores
+        # the result for the next run.
+        #
+        # `id: cache` is required so the next step can read the cache-hit
+        # output; without it the conditional is unbound and the build step
+        # would either always run or never run.
+
+      # Fast translation gate. Used to live as its own workflow
+      # (.github/workflows/i18n.yml); merged in here so a translation gap
+      # fails before the ucode toolchain build is paid for. python3 +
+      # po/templates/homeproxy.pot + po/zh_Hans/homeproxy.po are all that
+      # is needed - no ucode, no sing-box, no node - so this step runs in
+      # seconds and short-circuits the rest of the job when a translator
+      # falls behind. The .pot-vs-source check stays where it was,
+      # because that one needs the freshly built toolchain.
+      - name: Check zh_Hans translation coverage (fast gate)
+        run: python3 tests/i18n-coverage.py --fail-below 100
+
+      - name: Restore ucode toolchain cache
+        id: cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          # `~` explicitly, not `${{ env.HOME }}`: env.HOME is empty in GitHub
+          # Actions (the comment below the build step already says so), so the
+          # path used to expand to /.local/ucode-testbed and the action refused
+          # to save anything ("Path Validation Error") - the cache never hit,
+          # every run rebuilt the toolchain, and a restored cache would have
+          # landed somewhere the next step's PATH did not look.
+          path: ~/.local/ucode-testbed
+          key: ${{ runner.os }}-ucode-testbed-${{ hashFiles('tests/toolchain/build-ucode-linux.sh') }}
+
+      - name: Build ucode toolchain (cache miss only)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sh tests/toolchain/build-ucode-linux.sh
+
+      - name: Verify the toolchain is usable
+        # A cache hit skips the build, so this is what proves the restored
+        # prefix actually holds a working toolchain.  Without it a stale or
+        # half-populated cache turns into a run where tests/run.sh takes its
+        # SKIP branch - which is a non-zero exit now (3), but the message here
+        # names the cause instead of leaving it to the suite.
+        run: |
+          test -x "$HOME/.local/ucode-testbed/bin/ucode" || {
+            echo "::error title=Toolchain missing::no ucode in $HOME/.local/ucode-testbed/bin (cache hit without a usable prefix?)"
+            exit 1
+          }
+          "$HOME/.local/ucode-testbed/bin/ucode" -e 'printf("ucode %s\n", ARGV[0] ?? "ok");'
+
+      - name: Run the off-target test suite
+        # tests/run.sh is the single list of what the suite is.  The steps that
+        # used to live here re-implemented parts of it (the form snapshots, the
+        # three frontend invariants, the ucode suite), and the two lists
+        # drifted: arch-guard.sh, json-assets.js, frontend-rpc-fallbacks.js and
+        # frontend-title-escaping.js all ran under tests/run.sh but never in
+        # CI - the note on the snapshot step said to keep the lists in sync and
+        # nothing enforced it.  Calling the script deletes the second list.
+        #
+        # HP_TEST_HOST is unset so run.sh takes its local branch: the toolchain
+        # is on PATH from the cache step above.  run.sh checks the local
+        # toolchain first, then the ssh fallback, then skips - and a skip here
+        # is not a pass: it exits 3 with a PARTIAL line, so a toolchain that
+        # silently fails to build cannot report a green run.
+        env:
+          # PATH must put the toolchain bin first so the matching sing-box wins
+          # over any /usr/local/bin stray.  $HOME is a shell variable here, not
+          # the env context - env.HOME is empty in GitHub Actions because HOME
+          # is not part of the runner's declared env - so PATH has to be
+          # assembled in the shell where $HOME expands.
+          HP_VALIDATE_DATA: ${{ github.workspace }}/tests/toolchain/validate-data.sh
+        run: |
+          export PATH="$HOME/.local/ucode-testbed/bin:$PATH"
+          unset HP_TEST_HOST
+          sh tests/run.sh
+
+      - name: Check the translation template is current
+        # The fast translation gate earlier in this job only reads
+        # po/templates/homeproxy.pot -> po/zh_Hans/homeproxy.po, so it cannot
+        # see a string that was never added to the template.  Adding
+        # `_('brand new string')` to a view left it reporting 100%: the .pot
+        # was simply never regenerated, and the new string was invisible to
+        # every gate.  Regenerating from source and requiring no diff closes
+        # that hole - a new string must appear in the template (and therefore
+        # in the coverage count) before it can pass.
+        run: |
+          bash .github/rescan-translation.sh
+
+          # Compare the msgid SET, not the file. The scanner also records
+          # `#: file:line` for every message, so requiring an unchanged po/
+          # failed on any edit that shifted a line in a view - 788 changed
+          # lines and not one changed string. That is noise, and a gate that
+          # cries wolf gets ignored.
+          #
+          # A msgid that appears or disappears is the thing this step is for:
+          # a new string must reach the template, where the fast translation
+          # gate earlier in this job can insist it is translated. Removing one
+          # is equally deliberate and worth seeing.
+          changed="$(git diff -U0 -- po/ | grep -E '^[-+]msgid ' | grep -vE '^[-+]msgid ""$' || true)"
+
+          if [ -n "$changed" ]; then
+            echo "::error title=Translation template::the set of translatable strings changed - run .github/rescan-translation.sh and commit po/"
+            printf '%s\n' "$changed"
+            exit 1
+          fi
+
+          echo "the translatable string set is unchanged (location drift is ignored)"
+
+
+          # Location comments are therefore allowed to be stale. Regenerating
+          # them is a separate, optional chore; keeping the .pot free of churn
+          # matters more than keeping its line numbers exact.

@@ -1,0 +1,150 @@
+name: On-target test
+
+# Runs the suite against a LAN test machine addressed by HP_TEST_HOST (there is
+# no default address: the old header named 192.168.1.102, which tests/run.sh
+# stopped falling back to and which no longer answers).
+#
+# Manual only, on purpose. It needs a runner that can reach the machine and an
+# SSH key from a secret, neither of which is true of a hosted runner by default;
+# and a self-hosted runner that quietly ran the whole suite on every push to a
+# machine sitting on someone's desk is not something to enable by accident.
+#
+# What this job is careful about:
+#
+#   * it never installs anything. tests/run.sh copies the checkout to the target
+#     and runs it there. Running the package manager on the device is what
+#     rewrote /etc/config/homeproxy from the feed package and lost the user's
+#     node configuration; see tests/README.md, "The staging policy: never
+#     install". This workflow adds no apk/opkg step, and it must not.
+#
+#   * it refuses to run against the production router. The suite untars a whole
+#     checkout onto whatever host it is pointed at, and 192.168.1.1 is the box
+#     the house routes through. The guard below is deliberately a hard failure
+#     rather than a warning.
+#
+#   * it reports the version skew it cannot fix. The target has its own build of
+#     the app installed (or none) and its own sing-box; what is tested is the
+#     checkout.
+#
+# Requires one repository secret:
+#
+#   HP_SSH_KEY   the private key for the test machine, in OpenSSH format
+#
+# and one optional repository variable:
+#
+#   HP_TEST_HOST   no default; supply a value or leave blank (the workflow
+#                  then fails fast rather than ssh into a guessed address)
+#
+# and one optional repository secret:
+#
+#   HP_SSH_KNOWN_HOSTS   the target's known_hosts line(s) - the output of
+#                        `ssh-keyscan -H <host>` taken once on a trusted
+#                        machine. When it is set, the host key is pinned and a
+#                        changed key fails the job. When it is not set the
+#                        workflow falls back to ssh-keyscan (trust-on-first-use)
+#                        and says so in a warning annotation: the previous
+#                        comment claimed the key was "pinned when set", but
+#                        there was no way to set it, so every run trusted
+#                        whatever answered first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: 'Test machine (user@host). The production router is refused.'
+        required: false
+        type: string
+        default: ''
+      require_fw4:
+        description: 'Fail instead of skipping the fw4 render layer (a target always has firewall4)'
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: on-target
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  on-target:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+
+      - name: Refuse the production router
+        env:
+          HOST: ${{ inputs.host }}
+        run: |
+          # The staging untars the whole checkout onto the target. 192.168.1.1
+          # is the production router - tests/run.sh says so in its header and
+          # tests/README.md documents it - and the suite must never land there.
+          case "$HOST" in
+            *192.168.1.1|*192.168.1.1:*)
+              echo "::error title=Refusing to run::the production router is not a test target"
+              exit 1
+              ;;
+          esac
+          if [ -z "$HOST" ]; then
+            echo "::error title=No target::HP_TEST_HOST is empty; supply one (e.g. root@<test-machine>) or skip this workflow"
+            exit 1
+          fi
+          echo "target: $HOST (the test machine, not the production router)"
+
+      - name: Set up the SSH key
+        env:
+          HP_SSH_KEY: ${{ secrets.HP_SSH_KEY }}
+          HP_SSH_KNOWN_HOSTS: ${{ secrets.HP_SSH_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$HP_SSH_KEY" ]; then
+            echo "::error title=Missing secret::HP_SSH_KEY is not set for this repository"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$HP_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # The suite connects with BatchMode, so an unverified host key is a
+          # hard failure rather than a prompt. Prefer the pinned key when the
+          # HP_SSH_KNOWN_HOSTS secret is set; only fall back to a scan (which
+          # trusts whatever answers first) when it is not, and say which one
+          # happened so a TOFU run is never mistaken for a pinned one.
+          if [ -n "$HP_SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$HP_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            chmod 600 ~/.ssh/known_hosts
+            echo "::notice::host key pinned from HP_SSH_KNOWN_HOSTS"
+          else
+            ssh-keyscan -T 10 -H "$(printf '%s' "${{ inputs.host }}" | cut -d@ -f2)" \
+              >> ~/.ssh/known_hosts 2>/dev/null || true
+            echo "::warning::HP_SSH_KNOWN_HOSTS is not set - the target's host key is trust-on-first-use (ssh-keyscan)"
+          fi
+
+      - name: Run the suite against the target
+        env:
+          HOST: ${{ inputs.host }}
+          # tests/run.sh validates this as 0/1 and defaults it to 1. The input
+          # is a boolean here, so map it explicitly: interpolating the raw
+          # `true`/`false` made the value unusable, which is how the switch
+          # stayed dead even after it was passed through.
+          HP_REQUIRE_FW4: ${{ inputs.require_fw4 && '1' || '0' }}
+        run: |
+          # tests/run.sh takes the ssh branch on its own here: this runner has
+          # no ucode and no sing-box, so the local branch cannot apply.
+          HP_TEST_HOST="$HOST" sh tests/run.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### On-target run"
+            echo
+            echo "- target: \`${{ inputs.host }}\`"
+            echo "- fw4 render layer required: \`${{ inputs.require_fw4 && '1' || '0' }}\`"
+            echo "- staging only: no package was installed and no apk/opkg command was run"
+            echo "- the target's installed app version and sing-box version are printed near the top of the log"
+          } >> "$GITHUB_STEP_SUMMARY"
