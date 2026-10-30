@@ -10,8 +10,20 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+msgid "(triggers daily, interval is enforced by the script)"
+msgstr "（每天触发，实际间隔由脚本判定）"
+
 msgid "Access Info"
 msgstr "访问信息"
+
+msgid "Advanced: 5-field cron expression, overrides the two items above when valid. Leave empty to generate automatically."
+msgstr "高级用法：5 段式 cron 表达式，填写合法内容后将覆盖上面两项；留空则自动生成。"
+
+msgid "Already up to date (%s)"
+msgstr "已是最新版本（%s）"
+
+msgid "Another update is already running"
+msgstr "已有更新任务在运行"
 
 msgid "Arch"
 msgstr "架构"
@@ -24,6 +36,9 @@ msgstr "自动更新"
 
 msgid "Auto Update Log"
 msgstr "自动更新日志"
+
+msgid "Auto update settings saved."
+msgstr "自动更新设置已保存。"
 
 msgid "Background Decoration"
 msgstr "背景装饰"
@@ -48,6 +63,9 @@ msgstr "取消"
 
 msgid "Card Background"
 msgstr "卡片背景"
+
+msgid "Check and install the latest version right now?"
+msgstr "立即检查并安装最新版本？"
 
 msgid "Checking upstream…"
 msgstr "正在检查上游…"
@@ -97,14 +115,17 @@ msgstr "CPU 使用率"
 msgid "Crash Threshold (s)"
 msgstr "崩溃阈值（秒）"
 
-msgid "Credentials reset to default, service restarting…"
-msgstr "凭据已重置为默认，服务正在重启…"
-
 msgid "Current Installation"
 msgstr "当前安装信息"
 
+msgid "Custom Cron"
+msgstr "自定义 Cron"
+
 msgid "d"
 msgstr "天"
+
+msgid "Daily Run Time"
+msgstr "执行时刻"
 
 msgid "Data Dir"
 msgstr "数据目录"
@@ -136,11 +157,14 @@ msgstr "下载 Gately 核心"
 msgid "Downloading…"
 msgstr "正在下载…"
 
-msgid "Download & Update"
-msgstr "下载与更新"
-
 msgid "Download URL not found"
 msgstr "未找到下载地址"
+
+msgid "Effective cron: %s"
+msgstr "生效的 Cron：%s"
+
+msgid "Effective Schedule"
+msgstr "生效计划"
 
 msgid "Enable Auto Update"
 msgstr "启用自动更新"
@@ -156,6 +180,9 @@ msgstr "解压失败"
 
 msgid "Failed"
 msgstr "失败"
+
+msgid "Failed to start"
+msgstr "启动失败"
 
 msgid "Failed to start check"
 msgstr "无法启动检查"
@@ -217,6 +244,9 @@ msgstr "GitHub LuCI"
 msgid "h"
 msgstr "小时"
 
+msgid "If checking times out, fill a GitHub proxy prefix and save. Leave empty for direct connection."
+msgstr "检查超时时，在此填写 GitHub 代理前缀后保存；留空则直连。"
+
 msgid "Include pre-release"
 msgstr "包含预发布版本"
 
@@ -240,6 +270,9 @@ msgstr "立即安装"
 
 msgid "Invalid update request"
 msgstr "无效的更新请求"
+
+msgid "It uses the current release channel and mirror settings. If a newer version is found it will be downloaded and installed, and the service will be restarted."
+msgstr "将使用当前的发布通道与镜像设置；若发现新版本会自动下载安装，并重启服务。"
 
 msgid "Language pack installation failed"
 msgstr "语言包安装失败"
@@ -276,6 +309,9 @@ msgstr "未找到版本"
 
 msgid "NOT RUNNING"
 msgstr "未运行"
+
+msgid "Not running"
+msgstr "未在运行"
 
 msgid "Official Website"
 msgstr "官方网站"
@@ -328,27 +364,6 @@ msgstr "发布标签"
 msgid "Reset"
 msgstr "重置"
 
-msgid "Reset admin password back to the default gately.cn"
-msgstr "将管理员密码重置为默认密码 gately.cn"
-
-msgid "Reset admin password to default (gately.cn)? Service will restart."
-msgstr "将管理员密码重置为默认密码（gately.cn）？服务将重启。"
-
-msgid "Reset Credentials"
-msgstr "重置凭据"
-
-msgid "Reset Failed"
-msgstr "重置失败"
-
-msgid "Reset failed, please check the log."
-msgstr "重置失败，请检查日志。"
-
-msgid "Reset password"
-msgstr "重置密码"
-
-msgid "Reset Success"
-msgstr "重置成功"
-
 msgid "Respawn Delay (s)"
 msgstr "守护延迟（秒）"
 
@@ -376,6 +391,12 @@ msgstr "恢复失败"
 msgid "Restore Gately config from a previous backup"
 msgstr "从之前的备份恢复 Gately 配置"
 
+msgid "Run Auto Update Now"
+msgstr "立即执行一次自动更新"
+
+msgid "Run Now"
+msgstr "立即执行"
+
 msgid "RUNNING"
 msgstr "运行中"
 
@@ -402,6 +423,9 @@ msgstr "设置保存成功。"
 
 msgid "SHA256 verification failed"
 msgstr "SHA256 校验失败"
+
+msgid "Skipped: interval not reached"
+msgstr "已跳过：未到更新间隔"
 
 msgid "Stable"
 msgstr "稳定版"
@@ -439,6 +463,9 @@ msgstr "Gately 可执行文件缺失。请下载以启动服务。"
 msgid "Threads:"
 msgstr "线程数："
 
+msgid "Time of day for the scheduled check (HH:MM)"
+msgstr "定时检查的时刻（时:分）"
+
 msgid "Unknown"
 msgstr "未知"
 
@@ -454,6 +481,9 @@ msgstr "不支持的文件格式"
 msgid "Update check failed"
 msgstr "更新检查失败"
 
+msgid "Updated to %s"
+msgstr "已更新到 %s"
+
 msgid "Uptime:"
 msgstr "运行时长："
 
@@ -465,9 +495,6 @@ msgstr "运行时间超过 %s 秒时重置重试计数"
 
 msgid "URL"
 msgstr "网址"
-
-msgid "Used for the page shortcut. Change the actual port in Gately settings."
-msgstr "用于页面快捷跳转。实际端口请在 Gately 设置中修改。"
 
 msgid "Version:"
 msgstr "版本："
@@ -505,26 +532,8 @@ msgstr "关：仅内网可访问。开：外网也可访问。"
 msgid "Admin Password"
 msgstr "管理员密码"
 
-msgid "Set a new admin password (min 8 chars), applied on restart."
-msgstr "设置新的管理员密码（至少 8 位），重启后生效。"
-
-msgid "New password (min 8 chars)"
-msgstr "新密码（至少 8 位）"
-
-msgid "Apply Password"
-msgstr "应用密码"
-
-msgid "Too Short"
-msgstr "长度过短"
-
 msgid "Password must be at least 8 characters."
 msgstr "密码至少需要 8 个字符。"
-
-msgid "Set admin password and restart service?"
-msgstr "设置管理员密码并重启服务？"
-
-msgid "Password submitted, service restarting…"
-msgstr "密码已提交，服务正在重启…"
 
 msgid "Password set failed, please check the log."
 msgstr "密码设置失败，请检查日志。"
@@ -532,26 +541,8 @@ msgstr "密码设置失败，请检查日志。"
 msgid "Ready to install Gately %s ?"
 msgstr "准备安装 Gately %s ？"
 
-msgid "Architecture: %s"
-msgstr "架构：%s"
-
-msgid "Package: %s"
-msgstr "安装包：%s"
-
 msgid "The binary will be replaced and the service restarted."
 msgstr "将替换二进制文件并重启服务。"
-
-msgid "Submitted"
-msgstr "已提交"
-
-msgid "Leave blank to keep unchanged"
-msgstr "留空则不改变"
-
-msgid "Leave blank to keep unchanged, or enter a new password (min 8 chars)."
-msgstr "留空则不改变，或填写新密码（至少 8 位）。"
-
-msgid "Applied together with Save, then the service restarts."
-msgstr "随保存一并应用，随后服务重启。"
 
 msgid "Gately is not initialized yet. Start it once before setting a password."
 msgstr "Gately 尚未初始化。请先启动一次再设置密码。"
@@ -565,23 +556,11 @@ msgstr "留空则保持当前密码不变；如需修改，请输入至少 8 位
 msgid "Takes effect when you save; the service restarts afterwards."
 msgstr "保存后生效，随后服务自动重启。"
 
-msgid "Core Update"
-msgstr "核心更新"
-
-msgid "Check, download and install Gately core updates"
-msgstr "检查、下载并安装 Gately 核心更新"
-
-msgid "Open Update page"
-msgstr "打开更新页面"
-
 msgid "Update Settings"
 msgstr "更新设置"
 
 msgid "GitHub Acceleration Mirror"
 msgstr "GitHub 加速镜像"
-
-msgid "If checking times out (rc=28, cannot reach github.com), fill a GitHub proxy prefix and save. Leave empty for direct connection."
-msgstr "在此填写 GitHub 代理前缀后保存；留空则直连。"
 
 msgid "Common prefix ends with /, e.g. https://ghfast.top/"
 msgstr "前缀以 / 结尾，例如 https://ghfast.top/"

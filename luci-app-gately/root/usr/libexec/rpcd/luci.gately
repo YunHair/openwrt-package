@@ -17,10 +17,14 @@ const SETTINGS = {
     safe_url: '', internet_access: '0',
     respawn_threshold: '3600', respawn_timeout: '30', respawn_retry: '5',
     auto_update: '0', update_interval: '7', installed_version: '',
+    update_time: '03:00', update_cron: '',
     github_mirror: '',
     theme: 'auto', bg: '1',
     color_primary: '', color_text: '', color_card: '', color_deco: ''
 };
+
+// 这些键变化后需要重写 crontab（reload 里只做 init_config + sync_cron，很轻）
+const CRON_KEYS = ['auto_update', 'update_interval', 'update_time', 'update_cron'];
 
 const RESTART_KEYS = [
     'enabled', 'port', 'delay',
@@ -133,27 +137,35 @@ function scheduleShellCommand(command) {
 }
 
 function scheduleServiceAction(action) {
-    if (action !== 'start' && action !== 'stop' && action !== 'restart')
+    if (action !== 'start' && action !== 'stop' && action !== 'restart' && action !== 'reload')
         return false;
     return scheduleShellCommand(`${shellQuote(INIT)} ${action}`);
 }
 
-function getTaskStatus(doneTag) {
-    let sf = uf('status');
+// 有更新任务在跑时拒绝新任务（脚本内部也有加锁，这里只是让 UI 立刻给出提示）
+function updateBusy() {
+    if (!exists(DIR + '/.lock')) return false;
+    let pid = int(trim(read(DIR + '/.lock/pid')));
+    return pid > 0 && exists(`/proc/${pid}`);
+}
+
+function getTaskStatus(opts) {
+    opts = opts || {};
+    let sf  = uf(opts.statusFile || 'status');
+    let lf  = uf(opts.logFile || 'log');
+    let pf  = uf('progress');
+    let doneTag = opts.doneTag || 'done:';
+
     if (!exists(sf)) return { status: 'idle', code: 'idle' };
 
     let st  = trim(read(sf));
-    let log = exists(uf('log'))
-            ? exec(`cat '${uf('log')}' 2>/dev/null`)
-            : '';
+    let log = exists(lf) ? exec(`cat '${lf}' 2>/dev/null`) : '';
 
     for (let s in ['checking', 'downloading', 'installing']) {
         if (substr(st, 0, length(s)) === s) {
             let resp = { status: s, code: s, log };
-            if (s === 'downloading') {
-                let pf = uf('progress');
+            if (s === 'downloading')
                 resp.progress = exists(pf) ? (int(trim(read(pf))) || 0) : 0;
-            }
             return resp;
         }
     }
@@ -328,13 +340,18 @@ const api = {
         // 只写入本次实际提供的键；比对旧值判断是否需要重启。
         let restartSet = {};
         for (let k in RESTART_KEYS) restartSet[RESTART_KEYS[k]] = true;
+        let cronSet = {};
+        for (let k in CRON_KEYS) cronSet[CRON_KEYS[k]] = true;
 
         let sets = [];
-        let needRestart = false;
+        let needRestart = false, needCron = false;
         for (let k in SETTINGS) {
             if (a[k] === null) continue;
             let old = readUciOption(k, SETTINGS[k] || '');
-            if (old !== a[k] && restartSet[k]) needRestart = true;
+            if (old !== a[k]) {
+                if (restartSet[k]) needRestart = true;
+                if (cronSet[k])    needCron = true;
+            }
             push(sets, `uci -q set gately.gately.${k}=${shellQuote(a[k])}`);
         }
 
@@ -354,8 +371,14 @@ const api = {
             needRestart = true;
         }
 
-        if (needRestart && !scheduleServiceAction('restart'))
-            return { result: 'error', msg: 'service_action_failed' };
+        if (needRestart) {
+            if (!scheduleServiceAction('restart'))
+                return { result: 'error', msg: 'service_action_failed' };
+        } else if (needCron) {
+            // 只改了自动更新相关项：reload 即可重写 crontab，不打断服务
+            if (!scheduleServiceAction('reload'))
+                return { result: 'error', msg: 'service_action_failed' };
+        }
         return { result: 'ok' };
     },
 
@@ -442,10 +465,25 @@ const api = {
         return { result: 'ok' };
     },
 
-    run_update: () => {
-        sys(`rm -f '${DIR}/status' '${DIR}/progress'`);
-        sys(`setsid '${SCRIPT}' >/dev/null 2>&1 &`);
+    // 手动触发一次自动更新（与 cron 跑的是同一条链路：检查 → 需要则下载安装）
+    run_auto_update: () => {
+        if (updateBusy()) return { result: 'error', msg: 'busy' };
+        sys(`mkdir -p '${DIR}' && rm -f '${DIR}/autostatus' '${DIR}/progress'`);
+        let f = open(uf('autostatus'), 'w');
+        if (f) { f.write('checking'); f.close(); }
+        sys(`setsid '${SCRIPT}' auto manual >/dev/null 2>&1 &`);
         return { result: 'ok' };
+    },
+
+    // 自动更新用独立的状态/日志，不干扰「检查更新」面板
+    get_auto_run_status: () => {
+        let r = getTaskStatus({ statusFile: 'autostatus', logFile: 'autoupdate.log' });
+        if (r.status === 'done') {
+            let p = split(`${r.installed || ''}`, ':');
+            r.state   = p[0] || 'uptodate';
+            r.version = p[1] || '';
+        }
+        return r;
     },
 
     get_upstream_version: (a) => runTask('checking',
@@ -458,7 +496,7 @@ const api = {
             `download '${a.tag}' '${a.filename}' '${ucv('binpath')}'`)
         : { result: 'error' },
 
-    get_update_status: () => getTaskStatus('done:'),
+    get_update_status: () => getTaskStatus({}),
 
     get_auto_update_log: (a) => {
         let logfile = (a && a.type === 'run') ? SLOG : ALOG;
@@ -513,8 +551,9 @@ const SIGS = {
     reset_password:         {},
     set_admin_password:     { password: 'String' },
     get_update_status:      {},
+    get_auto_run_status:    {},
     get_auto_update_log:    { type: 'String' },
-    run_update:             {},
+    run_auto_update:        {},
     clean_update:           {},
     save_settings:          {},
     toggle_service:         { action: 'String' },

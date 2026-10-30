@@ -2,7 +2,7 @@
 'require baseclass';
 'require rpc';
 
-var GATELY_ASSET_VERSION = '1.1.8-r1';
+var GATELY_ASSET_VERSION = '1.2.0-r1';
 var themeMode = 'auto';
 var themeMedia = window.matchMedia
     ? window.matchMedia('(prefers-color-scheme: dark)')
@@ -46,6 +46,7 @@ var ICONS = {
     box:      ['M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z',
                'M3.27 6.96L12 12.01l8.73-5.05', 'M12 22.08V12'],
     sliders:  ['M4 21v-7', 'M4 10V3', 'M12 21v-9', 'M12 8V3', 'M20 21v-5', 'M20 12V3', 'M1 14h6', 'M9 8h6', 'M17 16h6'],
+    play:     ['M5 3l14 9-14 9V3z'],
     shield:   ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z']
 };
 
@@ -930,6 +931,7 @@ var TASK_MESSAGES = {
     file_not_found: _('File not found'),
     configdir_missing: _('Config directory is not set'),
     language_pack_failed: _('Language pack installation failed'),
+    busy: _('Another update is already running'),
     error: _('Error')
 };
 

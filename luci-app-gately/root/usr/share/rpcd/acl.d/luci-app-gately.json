@@ -10,6 +10,7 @@
                     "get_settings",
                     "get_process_stats",
                     "get_update_status",
+                    "get_auto_run_status",
                     "get_auto_update_log",
                     "get_upstream_version",
                     "list_backups"
@@ -22,7 +23,7 @@
                     "save_settings",
                     "toggle_service",
                     "reset_password",
-                    "run_update",
+                    "run_auto_update",
                     "clean_update",
                     "do_update",
                     "restore_backup"

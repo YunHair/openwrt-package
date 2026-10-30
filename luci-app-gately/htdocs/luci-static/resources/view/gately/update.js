@@ -11,13 +11,35 @@ var api = {
     updDo:       C.rpc('do_update',            ['tag', 'filename']),
     autoLog:     C.rpc('get_auto_update_log',  ['type']),
     cleanUpdate: C.rpc('clean_update'),
-    saveSettings: C.rpc('save_settings',
-        ['release_type', 'github_mirror',
-         'auto_update', 'update_interval'])
+    runAuto:     C.rpc('run_auto_update'),
+    autoStat:    C.rpc('get_auto_run_status'),
+    saveSettings: C.rpc('save_settings', ['release_type', 'github_mirror']),
+    saveAuto:     C.rpc('save_settings',
+        ['auto_update', 'update_interval', 'update_time', 'update_cron'])
 };
 
 var $    = function(id) { return document.getElementById(id); };
 var ucig = function(k) { return uci.get('gately', 'gately', k); };
+var viewRef = null;   // 当前视图实例，供异步回调刷新顶部信息
+
+// 与 /etc/init.d/gately 里的 build_cron_spec 保持一致，用于界面实时预览
+function cronSpec(iv, time, custom) {
+    var c = (custom || '').replace(/[\r\n\t]/g, '').replace(/^\s+|\s+$/g, '');
+    if (c) {
+        if (c.split(/\s+/).length === 5 && /^[0-9*\/,_ -]+$/.test(c)) return c;
+    }
+    var m = /^(\d{1,2}):(\d{1,2})$/.exec((time || '').replace(/^\s+|\s+$/g, ''));
+    var h  = m ? parseInt(m[1], 10) : 3;
+    var mi = m ? parseInt(m[2], 10) : 0;
+    if (isNaN(h)  || h  > 23) h  = 3;
+    if (isNaN(mi) || mi > 59) mi = 0;
+    var n = parseInt(iv, 10);
+    if (isNaN(n) || n < 1) n = 7;
+    if (n > 365) n = 365;
+    // Cron 的「日/步长」无法精确表达 > 28 天，此时改为每天触发，由脚本判定是否到期
+    if (n === 1 || n > 28) return mi + ' ' + h + ' * * *';
+    return mi + ' ' + h + ' */' + n + ' * *';
+}
 
 function buildInfoGrid() {
     var items = [
@@ -52,16 +74,10 @@ function buildSettingsCard() {
         click: function() {
             saveBtn.disabled = true;
 
-            var autoEl  = document.getElementById('_f_auto_update');
-            var ivEl    = document.getElementById('_f_update_interval');
-
             var relType = chkSel.value;
             var mirror  = mirrorInput.value.trim();
-            var auto    = (autoEl && autoEl.checked) ? '1' : '0';
-            var interval= (ivEl && ivEl.value) ? ivEl.value : '7';
 
-            L.resolveDefault(api.saveSettings(
-                relType, mirror, auto, interval), {}
+            L.resolveDefault(api.saveSettings(relType, mirror), {}
             ).then(function(res) {
                 saveBtn.disabled = false;
                 var ok = res && res.result === 'ok';
@@ -93,10 +109,60 @@ function buildSettingsCard() {
         C.buildFormRow('custom', 'set_mirror_row', _('GitHub Acceleration Mirror'),
             null,
             E('span', {}, [
-                _('If checking times out (rc=28, cannot reach github.com), fill a GitHub proxy prefix and save. Leave empty for direct connection.'), E('br'),
+                _('If checking times out, fill a GitHub proxy prefix and save. Leave empty for direct connection.'), E('br'),
                 _('Common prefix ends with /, e.g. https://ghfast.top/')
             ]),
             mirrorInput),
+        E('div', { class: 'gately-banner-row', style: 'justify-content:flex-end;' }, saveBtn)
+    ], { icon: 'gear' });
+}
+
+// 自动更新：开关 / 间隔 / 执行时刻 / 自定义 cron / 立即执行一次
+function buildAutoCard() {
+    var saveBtn = E('button', {
+        type: 'button',
+        class: 'gately-btn gately-btn-primary',
+        click: function() {
+            saveBtn.disabled = true;
+            var iv   = $('_f_update_interval');
+            var tm   = $('_f_update_time');
+            var cr   = $('_f_update_cron');
+            var auto = $('_f_auto_update');
+
+            L.resolveDefault(api.saveAuto(
+                (auto && auto.checked) ? '1' : '0',
+                (iv && iv.value) ? iv.value : '7',
+                (tm && tm.value) ? tm.value : '03:00',
+                (cr && cr.value) ? cr.value.trim() : ''
+            ), {}).then(function(res) {
+                saveBtn.disabled = false;
+                var ok = res && res.result === 'ok';
+                C.showToast({
+                    ok: ok,
+                    title: ok ? _('Saved') : _('Save failed'),
+                    msg: ok ? _('Auto update settings saved.') : C.saveMessage(res),
+                    timeout: ok ? 2000 : 0
+                });
+            }).catch(function() {
+                saveBtn.disabled = false;
+                C.showToast({
+                    ok: false,
+                    title: _('Save failed'),
+                    msg: _('Request failed, please try again.'),
+                    timeout: 0
+                });
+            });
+        }
+    }, [C.icon('check', 14), E('span', {}, _('Save'))]);
+
+    var runBtn = E('button', {
+        type: 'button',
+        id: 'auto_run_btn',
+        class: 'gately-btn gately-btn-success',
+        click: function() { runAutoConfirm(); }
+    }, [C.icon('play', 14), E('span', {}, _('Run Now'))]);
+
+    var card = C.buildCard(_('Auto Update'), [
         C.buildFormRow('toggle', 'auto_update', _('Enable Auto Update'),
             ucig('auto_update') || '0',
             _('Periodically check and install the latest version')),
@@ -104,8 +170,161 @@ function buildSettingsCard() {
             ucig('update_interval') || '7',
             _('Range: 1 – 365 days'),
             { style: 'width:80px;', min: '1', max: '365' }),
-        E('div', { class: 'gately-banner-row', style: 'justify-content:flex-end;' }, saveBtn)
-    ], { icon: 'gear' });
+        C.buildFormRow('time', 'update_time', _('Daily Run Time'),
+            ucig('update_time') || '03:00',
+            _('Time of day for the scheduled check (HH:MM)'),
+            { style: 'width:120px;' }),
+        C.buildFormRow('text', 'update_cron', _('Custom Cron'),
+            ucig('update_cron') || '',
+            _('Advanced: 5-field cron expression, overrides the two items above when valid. Leave empty to generate automatically.')),
+        C.buildFormRow('custom', 'cron_preview', _('Effective Schedule'), null, null,
+            E('div', { id: 'auto_cron_preview', class: 'gately-form-desc' }, '…')),
+        E('div', { class: 'gately-banner-row' }, [
+            E('span', { id: 'auto_run_stat', class: 'gately-state' },
+                _('Not running')),
+            E('span', { style: 'flex:1;' }),
+            runBtn, saveBtn
+        ]),
+        E('pre', { id: 'auto_run_log', class: 'gately-log' })
+    ], { icon: 'clock' });
+
+    // 预览挂在卡片内部（此时尚未插入文档，但已可直接查询到）
+    var ivIn = card.querySelector('#_f_update_interval');
+    var tmIn = card.querySelector('#_f_update_time');
+    var crIn = card.querySelector('#_f_update_cron');
+
+    function refreshPreview() {
+        var el  = card.querySelector('#auto_cron_preview');
+        if (!el) return;
+        var iv  = ivIn ? ivIn.value : '7';
+        var tm  = tmIn ? tmIn.value : '03:00';
+        var cr  = crIn ? crIn.value : '';
+        var txt = _('Effective cron: %s').format(cronSpec(iv, tm, cr));
+        if (!cr.replace(/\s/g, '') && parseInt(iv, 10) > 28)
+            txt += ' ' + _('(triggers daily, interval is enforced by the script)');
+        el.textContent = txt;
+        el.style.fontStyle = '';
+    }
+
+    [ivIn, tmIn, crIn].forEach(function(el) {
+        if (!el) return;
+        el.addEventListener('input',  refreshPreview);
+        el.addEventListener('change', refreshPreview);
+    });
+    refreshPreview();
+
+    return card;
+}
+
+function runAutoConfirm() {
+    var cancelBtn = E('button', {
+        type: 'button',
+        class: 'gately-btn',
+        click: function() { L.hideModal(); }
+    }, [E('span', {}, _('Cancel'))]);
+
+    var okBtn = E('button', {
+        type: 'button',
+        class: 'gately-btn gately-btn-success',
+        click: function() { L.hideModal(); startAutoRun(); }
+    }, [C.icon('play', 14), E('span', {}, _('Run Now'))]);
+
+    L.showModal(_('Run Auto Update Now'), [
+        E('div', { class: 'gately-modal' }, [
+            E('div', { class: 'gately-modal-head' }, [
+                C.icon('refresh', 20),
+                E('span', {}, _('Check and install the latest version right now?'))
+            ]),
+            E('p', { class: 'gately-modal-note' },
+                _('It uses the current release channel and mirror settings. If a newer version is found it will be downloaded and installed, and the service will be restarted.')),
+            E('div', { class: 'gately-modal-actions' }, [cancelBtn, okBtn])
+        ])
+    ]);
+}
+
+function startAutoRun() {
+    var btn  = $('auto_run_btn');
+    if (btn) btn.disabled = true;
+    C.setState('auto_run_stat', _('Starting…'), 'busy');
+
+    var lg = $('auto_run_log');
+    if (lg) lg.classList.add('is-open');
+
+    L.resolveDefault(api.runAuto(), {}).then(function(res) {
+        if (!res || res.result !== 'ok') {
+            if (btn) btn.disabled = false;
+            C.setState('auto_run_stat',
+                (res && res.msg === 'busy')
+                    ? _('Another update is already running')
+                    : _('Failed to start'),
+                'err');
+            return;
+        }
+        pollAutoRun();
+    }).catch(function() {
+        if (btn) btn.disabled = false;
+        C.setState('auto_run_stat', _('Failed to start'), 'err');
+    });
+}
+
+// 结果文案：state=updated / uptodate / skipped / 失败
+function autoResult(s) {
+    if (s.status === 'error')
+        return { text: C.taskMessage(s), kind: 'err' };
+    if (s.state === 'updated')
+        return { text: _('Updated to %s').format(s.version || ''), kind: 'ok' };
+    if (s.state === 'skipped')
+        return { text: _('Skipped: interval not reached'), kind: 'ok' };
+    return { text: _('Already up to date (%s)').format(s.version || ''), kind: 'ok' };
+}
+
+function pollAutoRun() {
+    var poller = C.LogPoller({
+        status:   function() { return api.autoStat(); },
+        textEl:   'auto_run_log',
+        interval: 1500,
+        terminal: function(s) {
+            var code = s.code || s.status;
+            return code === 'done' || code === 'error';
+        },
+        onTick: function(s) {
+            var code = s.code || s.status;
+            if (code === 'checking' || code === 'ready' || code === 'idle')
+                C.setState('auto_run_stat', _('Checking upstream…'), 'busy');
+            else if (code === 'downloading')
+                C.setState('auto_run_stat', _('Downloading…'), 'busy');
+            else if (code === 'installing')
+                C.setState('auto_run_stat', _('Installing…'), 'busy');
+            else if (code === 'error')
+                C.setState('auto_run_stat', C.taskMessage(s), 'err');
+        },
+        onDone: function(s) {
+            var btn = $('auto_run_btn');
+            if (btn) btn.disabled = false;
+            var r = autoResult(s);
+            C.setState('auto_run_stat', r.text, r.kind);
+            if (s.status !== 'error' && s.state === 'updated' && viewRef && viewRef._info)
+                viewRef._info();
+        }
+    });
+    poller.start();
+}
+
+// 页面打开时接续上一次/正在进行的自动更新状态
+function loadAutoState() {
+    L.resolveDefault(api.autoStat(), {}).then(function(s) {
+        var code = s && (s.code || s.status);
+        if (!code || code === 'idle') return;
+        if (code === 'checking' || code === 'downloading' || code === 'installing') {
+            var btn = $('auto_run_btn');
+            if (btn) btn.disabled = true;
+            pollAutoRun();
+            return;
+        }
+        var r = autoResult(s);
+        if (code === 'done' || code === 'error')
+            C.setState('auto_run_stat', r.text, r.kind);
+    });
 }
 
 function buildUpdateSection(t, title, iconKey, chkLabel, self) {
@@ -159,11 +378,13 @@ return view.extend({
 
     render: function() {
         var self = this;
+        viewRef = self;
 
         var content = E('div', { class: 'cbi-map gately-page' }, [
             E('h2', {}, _('Gately — Download & Update')),
             buildInfoGrid(),
             buildSettingsCard(),
+            buildAutoCard(),
             buildUpdateSection('upd', _('Gately Core Update'), 'download',
                 _('Check Upstream'), self),
             C.buildCard(_('Auto Update Log'), [
@@ -186,10 +407,11 @@ return view.extend({
                                 L.hideModal();
                                 L.resolveDefault(api.cleanUpdate(), {}).then(function(res) {
                                     var ok = res && res.result === 'ok';
-                                    ['upd_log', 'auto_log'].forEach(function(id) {
+                                    ['upd_log', 'auto_log', 'auto_run_log'].forEach(function(id) {
                                         var e = $(id);
                                         if (e) { e.textContent = ''; e.classList.remove('is-open'); }
                                     });
+                                    C.setState('auto_run_stat', _('Not running'), 'idle');
                                     C.showToast({
                                         ok:      ok,
                                         title:   ok ? _('Done') : _('Failed'),
@@ -231,6 +453,7 @@ return view.extend({
 
         C.initThemeButton();
         this._info();
+        loadAutoState();
         return content;
     },
 

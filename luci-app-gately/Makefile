@@ -5,7 +5,7 @@ LUCI_DEPENDS:=+luci-base +curl
 LUCI_PKGARCH:=all
 
 PKG_NAME:=luci-app-gately
-PKG_VERSION:=1.1.8
+PKG_VERSION:=1.2.0
 PKG_RELEASE:=1
 PKG_PO_VERSION:=$(PKG_VERSION)
 

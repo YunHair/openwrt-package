@@ -25,7 +25,9 @@ init_config() {
         "respawn_timeout=RESPAWN_TIMEOUT=30" \
         "respawn_retry=RESPAWN_RETRY=5" \
         "auto_update=AUTO_UPDATE=0" \
-        "update_interval=UPDATE_INTERVAL=7"
+        "update_interval=UPDATE_INTERVAL=7" \
+        "update_time=UPDATE_TIME=03:00" \
+        "update_cron=UPDATE_CRON="
     do
         key="${kv%%=*}"
         rest="${kv#*=}"
@@ -91,28 +93,80 @@ sync_gately_json() {
     ' 2>/dev/null
 }
 
-sync_cron() {
-    local current
-    current=$(grep "$CRON_TAG" "$CRON_FILE" 2>/dev/null)
+# 生成自动更新的 cron 时间部分（5 段），不包含命令。
+# 优先级：自定义 update_cron（合法 5 段时）> update_time + update_interval。
+build_cron_spec() {
+    local iv hour min custom
+    custom=$(printf '%s' "$UPDATE_CRON" | tr -d '\r\n\t' | sed 's/^ *//;s/ *$//')
+    if [ -n "$custom" ]; then
+        if [ "$(printf '%s' "$custom" | awk '{print NF}')" = "5" ] &&
+           printf '%s' "$custom" | grep -qE '^[0-9*/,_ -]+$'; then
+            printf '%s' "$custom"
+            return 0
+        fi
+        # stdout 会被 $(build_cron_spec) 捕获，提示必须走 stderr，否则会污染 crontab 行
+        log_msg "Invalid custom cron '$custom', falling back to interval + time" >&2
+    fi
 
-    if [ "$AUTO_UPDATE" = "1" ]; then
-        case "$current" in
-            *"*/${UPDATE_INTERVAL} * * $UPDATE_SCRIPT"*) return 0 ;;
-        esac
-        sed -i "/${CRON_TAG}/d" "$CRON_FILE" 2>/dev/null
-        echo "0 3 */${UPDATE_INTERVAL} * * $UPDATE_SCRIPT #${CRON_TAG}" >> "$CRON_FILE"
-        log_msg "Auto update cron set: every ${UPDATE_INTERVAL} day(s)"
+    # 末尾补 ":0" 保证没有冒号时 cut -f2 也能拿到 0
+    hour=$(printf '%s:0' "$UPDATE_TIME" | cut -d: -f1)
+    min=$(printf '%s:0'  "$UPDATE_TIME" | cut -d: -f2)
+    case "$hour" in
+        ''|*[!0-9]*) hour=3 ;;
+        *) hour=$(printf '%s' "$hour" | sed 's/^0*//'); hour=${hour:-0} ;;
+    esac
+    case "$min" in
+        ''|*[!0-9]*) min=0 ;;
+        *) min=$(printf '%s' "$min" | sed 's/^0*//'); min=${min:-0} ;;
+    esac
+    [ "$hour" -le 23 ] || hour=3
+    [ "$min"  -le 59 ] || min=0
+
+    case "$UPDATE_INTERVAL" in ''|*[!0-9]*) iv=7 ;; *) iv="$UPDATE_INTERVAL" ;; esac
+    [ "$iv" -ge 1 ]  || iv=7
+    [ "$iv" -gt 365 ] && iv=365
+
+    if [ "$iv" -eq 1 ]; then
+        printf '%d %d * * *' "$min" "$hour"
+    elif [ "$iv" -gt 28 ]; then
+        # 日/步长无法精确表达 >28 天，改为每天触发，由脚本按 last_auto_run 判定
+        printf '%d %d * * *' "$min" "$hour"
     else
+        printf '%d %d */%d * *' "$min" "$hour" "$iv"
+    fi
+}
+
+sync_cron() {
+    local current want
+
+    if [ "$AUTO_UPDATE" != "1" ]; then
+        current=$(grep -F "$CRON_TAG" "$CRON_FILE" 2>/dev/null)
         [ -z "$current" ] && return 0
         sed -i "/${CRON_TAG}/d" "$CRON_FILE" 2>/dev/null
         log_msg "Auto update cron removed."
+        /etc/init.d/cron restart >/dev/null 2>&1
+        return 0
     fi
 
-    /etc/init.d/cron restart 2>/dev/null
+    want="$(build_cron_spec) $UPDATE_SCRIPT #${CRON_TAG}"
+    current=$(grep -F "$CRON_TAG" "$CRON_FILE" 2>/dev/null)
+
+    # 已经是目标行就什么都不做：避免每次开机都重启一次 cron
+    [ "$current" = "$want" ] && return 0
+
+    mkdir -p "${CRON_FILE%/*}"
+    [ -f "$CRON_FILE" ] || : > "$CRON_FILE"
+    sed -i "/${CRON_TAG}/d" "$CRON_FILE" 2>/dev/null
+    echo "$want" >> "$CRON_FILE"
+    log_msg "Auto update cron set: $want"
+    /etc/init.d/cron restart >/dev/null 2>&1
 }
 
 start_service() {
     init_config
+
+    # 开机/升级后自动校准 cron（幂等：与目标行一致时不重启 cron）
+    sync_cron
 
     [ "$ENABLED" = "1" ] || { log_msg "Gately is disabled, skipping start."; return 0; }
 
