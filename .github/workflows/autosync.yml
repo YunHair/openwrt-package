@@ -96,7 +96,7 @@ jobs:
           "https://github.com/eamonxg/luci-app-aurora-config|master|full||luci-app-aurora-config"
           "https://github.com/UnblockNeteaseMusic/luci-app-unblockneteasemusic|js|full||luci-app-unblockneteasemusic"
           "https://github.com/zzsj0928/luci-app-pushbot|master|full| |luci-app-pushbot"
-          "https://github.com/szwjp/luci-app-homeproxy-pro|main|dirs|luci-app-homeproxy-pro|"
+          "https://github.com/szwjp/luci-app-homeproxy-pro|main|full|luci-app-homeproxy-pro|"
 
 
           
