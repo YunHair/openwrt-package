@@ -80,7 +80,6 @@ jobs:
         SYNC_TASKS=(
           # 示例1: 同步多个目录（从同一仓库）
           "https://github.com/VIKINGYFY/packages|main|dirs|luci-app-wolultra|"
-          "https://github.com/laipeng668/luci-app-gecoosac|main|dirs|gecoosac luci-app-gecoosac|"
           "https://github.com/kiddin9/op-packages|main|dirs|luci-app-podman |"
           "https://github.com/kenzok8/small-package|main|dirs|wrtbwmon luci-app-wrtbwmon|"         
           "https://github.com/destan19/OpenAppFilter|master|dirs|oaf luci-app-oaf open-app-filter|"
