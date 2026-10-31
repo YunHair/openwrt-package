@@ -197,6 +197,9 @@ version_lt() {
     local a b
     a=$(echo "$1" | sed 's/^v//')
     b=$(echo "$2" | sed 's/^v//')
+    # 空值没有可比性：不声称「更旧」，交给调用方按「未知」处理
+    [ -z "$a" ] && return 1
+    [ -z "$b" ] && return 1
     [ "$a" = "$b" ] && return 1
 
     local ca cb pa pb
@@ -211,6 +214,9 @@ version_lt() {
     for i in $(seq 1 "$n"); do
         va=$(printf '%s' "$ca" | awk -F. -v i="$i" '{print $i}'); va=${va:-0}
         vb=$(printf '%s' "$cb" | awk -F. -v i="$i" '{print $i}'); vb=${vb:-0}
+        # 非数字段按 0 处理：手工改坏的版本串不能把 [ -lt ] 变成语法错误
+        case "$va" in ''|*[!0-9]*) va=0 ;; esac
+        case "$vb" in ''|*[!0-9]*) vb=0 ;; esac
         [ "$va" -lt "$vb" ] && return 0
         [ "$va" -gt "$vb" ] && return 1
     done
@@ -228,12 +234,44 @@ version_lt() {
     [ "$lo" = "$ka" ]
 }
 
+# 从二进制自身读取版本，这是唯一可信的来源。
+# gately -version 输出小写 JSON：{"version":"0.6.2","commit":...,"buildDate":...,"go":...}
+# uci 里的 installed_version 只在本插件下载安装时写入，用户手动放置/替换过的
+# 二进制与它毫无关系，拿它当「当前版本」会得出错误结论。
+probe_binary_version() {
+    local bin="$1" out ver
+    [ -n "$bin" ] && [ -x "$bin" ] || return 1
+    if command -v timeout >/dev/null 2>&1; then
+        out=$(timeout 10 "$bin" -version 2>&1)
+    else
+        out=$("$bin" -version 2>&1)
+    fi
+    [ -n "$out" ] || return 1
+    # 紧凑化后按 JSON 取 version 字段，避免受空格/换行/附加日志影响
+    ver=$(printf '%s' "$out" | tr -d ' \t\r\n' \
+        | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' | head -1)
+    [ -n "$ver" ] || return 1
+    printf '%s\n' "$ver" | sed 's/^v//'
+}
+
+# uci 里记录的版本，仅作二进制探测失败时的兜底。
+# 记录里带路径：用户换过 binpath 后，旧记录说的是另一个文件，不能沿用。
 get_installed_version() {
-    uci -q get gately_plus.gately.installed_version 2>/dev/null || echo ""
+    local v p cur
+    v=$(uci -q get gately_plus.gately.installed_version 2>/dev/null)
+    [ -n "$v" ] || return 0
+    p=$(uci -q get gately_plus.gately.installed_version_path 2>/dev/null)
+    cur=$(uci_get binpath /usr/bin/gately)
+    if [ -n "$p" ] && [ "$p" != "$cur" ]; then
+        log "Ignore recorded version $v: it belongs to $p (current binpath $cur)"
+        return 0
+    fi
+    printf '%s\n' "$v"
 }
 
 save_installed_version() {
     uci -q set gately_plus.gately.installed_version="$1" 2>/dev/null
+    [ -n "$2" ] && uci -q set gately_plus.gately.installed_version_path="$2" 2>/dev/null
     uci -q commit gately_plus 2>/dev/null
 }
 
@@ -537,19 +575,36 @@ cmd_download() {
 
     log "Starting service..."
     /etc/init.d/gately-plus start 2>/dev/null
-    local ver; ver=$(tag_to_ver "$tag")
-    save_installed_version "${ver:-$tag}"
-    log "Installation complete: ${ver:-$tag}"
-    write_status "done:${ver:-$tag}"
+    local ver actual
+    ver=$(tag_to_ver "$tag")
+    actual=$(probe_binary_version "$binpath")
+    save_installed_version "${actual:-$ver}" "$binpath"
+    log "Installation complete: ${actual:-$ver} (tag $tag)"
+    write_status "done:${actual:-$ver}"
 }
 
+# 返回 0 = 需要下载安装；1 = 无需动作。
+# 只有「当前版本确实落后」才下载，相同或更新都不动现有二进制。
 maybe_update() {
     local cur="$1" latest="$2" label="$3"
-    if [ -n "$cur" ] && [ -n "$latest" ] && ! version_lt "$cur" "$latest"; then
-        log "$label is up to date ($cur)"
+    if [ -z "$latest" ]; then
+        log "$label: upstream version unknown, skip"
         return 1
     fi
-    return 0
+    if [ -z "$cur" ]; then
+        log "$label: current version unknown, install $latest"
+        return 0
+    fi
+    if version_lt "$cur" "$latest"; then
+        log "$label: $cur < $latest, update required"
+        return 0
+    fi
+    if [ "$cur" = "$latest" ]; then
+        log "$label is up to date ($cur)"
+    else
+        log "$label: installed $cur is newer than upstream $latest, keep it"
+    fi
+    return 1
 }
 
 # 长间隔（> 28 天）无法用 cron 的「日/步长」精确表达（*/29 只会在 1 号、30 号跑，
@@ -585,7 +640,9 @@ cmd_auto() {
     fi
 
     if [ "$trigger" != "manual" ] && ! auto_due; then
-        local skip_ver; skip_ver=$(get_installed_version)
+        local skip_ver
+        skip_ver=$(probe_binary_version "$binpath")
+        [ -z "$skip_ver" ] && skip_ver=$(get_installed_version)
         write_status "done:skipped:${skip_ver:-unknown}"
         return 0
     fi
@@ -595,10 +652,18 @@ cmd_auto() {
     log "Auto update: trigger=$trigger channel=$reltype arch=$arch"
     log "Effective settings: mirror=${GH_MIRROR:-none} binpath=$binpath arch=$arch"
 
-    local cur_ver=""
+    local cur_ver="" cur_src=""
     if [ -x "$binpath" ]; then
-        cur_ver=$(get_installed_version)
-        log "Current gately: ${cur_ver:-unknown}"
+        # 优先问二进制自己；问不出来再回退 uci 记录
+        cur_ver=$(probe_binary_version "$binpath") && cur_src="binary"
+        if [ -z "$cur_ver" ]; then
+            cur_ver=$(get_installed_version)
+            if [ -n "$cur_ver" ]; then
+                cur_src="recorded"
+                log "WARN: cannot read version from $binpath, fall back to recorded $cur_ver"
+            fi
+        fi
+        log "Current gately: ${cur_ver:-unknown} (source=${cur_src:-none})"
     else
         log "Gately binary not found, will download and install it"
     fi
@@ -618,7 +683,9 @@ cmd_auto() {
     if maybe_update "$cur_ver" "$(tag_to_ver "$latest_tag")" "Gately"; then
         cmd_download "$latest_tag" "$best_file" "$binpath"
         state="updated"
-        show_ver=$(tag_to_ver "$latest_tag")
+        # 以装好之后的二进制实际版本为准：tag 与内部 version 不一定逐字相同
+        show_ver=$(probe_binary_version "$binpath")
+        [ -z "$show_ver" ] && show_ver=$(tag_to_ver "$latest_tag")
     fi
 
     [ -z "$show_ver" ] && show_ver="unknown"

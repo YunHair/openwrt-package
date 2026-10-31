@@ -355,8 +355,12 @@ const api = {
 
         let sets = [];
         let needRestart = false, needCron = false;
+        // 版本记录由更新流程维护，不接受界面写入：一旦被清空，自动更新会把
+        // “当前版本未知”当成“落后”而重复下载
+        let readonlyKeys = { installed_version: true, installed_version_path: true };
         for (let k in SETTINGS) {
             if (a[k] === null) continue;
+            if (readonlyKeys[k]) continue;
             let old = readUciOption(k, SETTINGS[k] || '');
             if (old !== a[k]) {
                 if (restartSet[k]) needRestart = true;
