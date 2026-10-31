@@ -1,8 +1,6 @@
 'use strict';
 'require view';
-'require gately-plus/common';
-
-var C   = gately_common;
+'require gately-plus/common as C';
 var KEYS = [
     'port', 'safe_url', 'internet_access', 'delay',
     'configdir', 'binpath',

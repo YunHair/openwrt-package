@@ -1,9 +1,7 @@
 'use strict';
 'require view';
 'require uci';
-'require gately-plus/common';
-
-var C   = gately_common;
+'require gately-plus/common as C';
 var api = {
     info:        C.rpc('get_system_info'),
     updChk:      C.rpc('get_upstream_version', ['release_type', 'arch']),

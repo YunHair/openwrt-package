@@ -2,9 +2,7 @@
 'require view';
 'require poll';
 'require dom';
-'require gately-plus/common';
-
-var C   = gately_common;
+'require gately-plus/common as C';
 var api = {
     status:   C.rpc('get_status'),
     info:     C.rpc('get_system_info'),
