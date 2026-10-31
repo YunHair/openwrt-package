@@ -94,7 +94,7 @@ if [ -f "$${KEEP_FILE}" ]; then
 	echo ""
 	echo "luci-app-gately-plus 已卸载。下列内容按设计保留，未删除："
 	while IFS= read -r keep; do
-		[ -n "$${keep}" ] && printf '  %s\\n' "$${keep}"
+		[ -n "$${keep}" ] && echo "  $${keep}"
 	done < "$${KEEP_FILE}"
 	echo "  /etc/config/gately_plus"
 	echo "如需彻底清理，请自行删除以上路径。"
