@@ -234,4 +234,4 @@ restart() {
     fi
 }
 
-service_triggers() { procd_add_reload_trigger gately; }
+service_triggers() { procd_add_reload_trigger gately_plus; }

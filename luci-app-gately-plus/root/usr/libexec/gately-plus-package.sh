@@ -2,6 +2,7 @@
 BACKUP_FILE=/tmp/gately-plus-luci-app-backup.tar.gz
 UPGRADE_MARKER=/tmp/gately-plus-luci-app-upgrade
 PURGE_LIST=/tmp/gately-plus-luci-app-purge
+KEEP_FILE=/tmp/gately-plus-luci-app-keep
 DEFAULT_BIN=/usr/bin/gately
 DEFAULT_DATA=/etc/gately
 
@@ -66,24 +67,6 @@ pkg_upgrading() {
 	return 1
 }
 
-backup_state() {
-	local data_path="$1" tmp
-	set --
-	[ -e /etc/config/gately_plus ] && set -- "$@" etc/config/gately
-	if [ -n "$data_path" ] && { [ -e "$data_path" ] || [ -L "$data_path" ]; }; then
-		set -- "$@" "${data_path#/}"
-	fi
-	[ "$#" -gt 0 ] || return 0
-	tmp="$(mktemp /tmp/gately-plus-luci-app-backup.XXXXXX)" || return 1
-	if tar -czf "$tmp" -C / "$@" 2>/dev/null; then
-		chmod 600 "$tmp"
-		mv -f "$tmp" "$BACKUP_FILE"
-	else
-		rm -f "$tmp"
-		return 1
-	fi
-}
-
 purge_cron() {
 	local cron=/etc/crontabs/root init=/etc/init.d/cron
 	grep -q 'luci-app-gately-plus-autoupdate' "$cron" 2>/dev/null || return 0
@@ -91,18 +74,20 @@ purge_cron() {
 	[ -x "$init" ] && "$init" restart >/dev/null 2>&1 || true
 }
 
+# 只清理包管理器残留的临时文件。
+# 二进制、数据目录、/etc/config/gately_plus 一律保留 —— 卸载插件不等于删用户数据。
 write_purge_list() {
-	local bin_path="$1" data_path="$2"
 	{
-		[ -n "$bin_path" ] && printf '%s\n' "$bin_path"
-		[ -n "$data_path" ] && printf '%s\n' "$data_path"
-		printf '%s\n' /etc/config/gately_plus /etc/config/gately_plus-opkg /etc/config/gately_plus.apk-new /tmp/.uci/gately
+		printf '%s\n' \
+			/tmp/.uci/gately_plus \
+			/etc/config/gately_plus-opkg \
+			/etc/config/gately_plus.apk-new
 	} >"$PURGE_LIST"
 }
 
 uninstall_package() {
 	local bin_path data_path init=/etc/init.d/gately-plus
-	rm -f "$PURGE_LIST"
+	rm -f "$PURGE_LIST" "$BACKUP_FILE"
 	if pkg_upgrading "$@"; then
 		: >"$UPGRADE_MARKER"
 		return 0
@@ -116,8 +101,13 @@ uninstall_package() {
 	fi
 	purge_cron || true
 	uci -q commit gately_plus >/dev/null 2>&1 || true
-	backup_state "$data_path" || return 1
-	write_purge_list "$bin_path" "$data_path"
+	# 注意：这里不打包备份、也不交给 postrm 删除。
+	# 卸载后重新安装时，原二进制与数据目录仍在，配置直接可用。
+	write_purge_list
+	{
+		[ -n "$bin_path" ] && printf '%s\n' "$bin_path"
+		[ -n "$data_path" ] && printf '%s\n' "$data_path"
+	} >"$KEEP_FILE"
 }
 
 restore_backup() {

@@ -41,8 +41,14 @@ return view.extend({
                     msg = _('Gately is not initialized yet. Start it once before setting a password.');
                 else if (res.msg === 'password_set_failed')
                     msg = _('Password set failed, please check the log.');
+                else if (res.msg === 'configdir_invalid')
+                    msg = _('Data directory must be a non-empty absolute path.');
+                else if (res.msg === 'binpath_invalid')
+                    msg = _('Binary path must be a non-empty absolute path.');
                 else
                     msg = _('Save failed');
+            } else if (res.warn === 'binary_missing') {
+                msg = _('Saved. No Gately binary at the new path yet — it will be downloaded when the service starts.');
             }
             C.showToast({
                 ok:      ok,

@@ -52,6 +52,9 @@ msgstr "基本服务"
 msgid "Binary Path"
 msgstr "二进制路径"
 
+msgid "Binary path must be a non-empty absolute path."
+msgstr "二进制路径必须是非空的绝对路径。"
+
 msgid "Build Date"
 msgstr "构建日期"
 
@@ -132,6 +135,9 @@ msgstr "数据目录"
 
 msgid "Data Directory"
 msgstr "数据目录"
+
+msgid "Data directory must be a non-empty absolute path."
+msgstr "数据目录必须是非空的绝对路径。"
 
 msgid "Delay before starting after boot (only when uptime < 120s)"
 msgstr "开机后延迟启动（仅在启动时间小于 120 秒时生效）"
@@ -408,6 +414,9 @@ msgstr "秒"
 
 msgid "Saved"
 msgstr "已保存"
+
+msgid "Saved. No Gately binary at the new path yet — it will be downloaded when the service starts."
+msgstr "已保存。新路径下还没有 Gately 二进制，服务启动时会自动下载。"
 
 msgid "Save failed"
 msgstr "保存失败"

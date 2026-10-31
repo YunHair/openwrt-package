@@ -5,7 +5,7 @@ LUCI_DEPENDS:=+luci-base +curl
 LUCI_PKGARCH:=all
 
 PKG_NAME:=luci-app-gately-plus
-PKG_VERSION:=2.0.1
+PKG_VERSION:=2.0.2
 PKG_RELEASE:=1
 PKG_PO_VERSION:=$(PKG_VERSION)
 
@@ -74,19 +74,33 @@ define Package/$(PKG_NAME)/postrm
 #!/bin/sh
 [ -n "$${IPKG_INSTROOT}" ] && exit 0
 PURGE_LIST=/tmp/gately-plus-luci-app-purge
-[ -f "$${PURGE_LIST}" ] || exit 0
-while IFS= read -r path; do
-	case "$${path}" in
-		/*)
-			case "$${path}" in
-				/|/etc|/etc/config|/usr|/usr/bin|/usr/sbin|/bin|/sbin|/var|/tmp|/root|/home) continue ;;
-				*'/../'*|*'/..'|*'/./'*|*'/.'|*//*|*[!A-Za-z0-9_./-]*) continue ;;
-			esac
-			rm -rf "$${path}"
-			;;
-	esac
-done < "$${PURGE_LIST}"
-rm -f "$${PURGE_LIST}"
+KEEP_FILE=/tmp/gately-plus-luci-app-keep
+if [ -f "$${PURGE_LIST}" ]; then
+	while IFS= read -r path; do
+		case "$${path}" in
+			/*)
+				case "$${path}" in
+					/|/etc|/etc/config|/usr|/usr/bin|/usr/sbin|/bin|/sbin|/var|/tmp|/root|/home) continue ;;
+					*'/../'*|*'/..'|*'/./'*|*'/.'|*//*|*[!A-Za-z0-9_./-]*) continue ;;
+				esac
+				rm -rf "$${path}"
+				;;
+		esac
+	done < "$${PURGE_LIST}"
+	rm -f "$${PURGE_LIST}"
+fi
+# 卸载不删用户数据：二进制与数据目录由 prerm 记录在 KEEP_FILE，这里只做提示
+if [ -f "$${KEEP_FILE}" ]; then
+	echo ""
+	echo "luci-app-gately-plus 已卸载。下列内容按设计保留，未删除："
+	while IFS= read -r keep; do
+		[ -n "$${keep}" ] && printf '  %s\\n' "$${keep}"
+	done < "$${KEEP_FILE}"
+	echo "  /etc/config/gately_plus"
+	echo "如需彻底清理，请自行删除以上路径。"
+	echo ""
+	rm -f "$${KEEP_FILE}"
+fi
 /etc/init.d/rpcd reload >/dev/null 2>&1 || true
 rm -rf /tmp/luci-*
 exit 0

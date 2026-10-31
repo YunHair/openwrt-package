@@ -58,8 +58,8 @@ function getGatelyInfo(bin) {
 }
 
 function ucv(k) {
-    let c = cursor(); c.load('gately');
-    return c.get('gately', 'gately', k) || SETTINGS[k] || '';
+    let c = cursor(); c.load('gately_plus');
+    return c.get('gately_plus', 'gately', k) || SETTINGS[k] || '';
 }
 
 function readUciOption(key, fallback) {
@@ -104,13 +104,13 @@ function writeUciOption(key, value) {
 }
 
 function commitUci(u, checks) {
-    if (!u.save('gately')) return false;
-    if (!u.commit('gately')) return false;
+    if (!u.save('gately_plus')) return false;
+    if (!u.commit('gately_plus')) return false;
     if (checks) {
         let v = cursor();
-        if (!v || !v.load('gately')) return false;
+        if (!v || !v.load('gately_plus')) return false;
         for (let k in checks) {
-            if (v.get('gately', 'gately', k) !== checks[k]) return false;
+            if (v.get('gately_plus', 'gately', k) !== checks[k]) return false;
         }
     }
     return true;
@@ -315,13 +315,23 @@ const api = {
     get_settings: () => {
         ensureUiOptions();
         let u = cursor(), r = {};
-        u.load('gately');
-        for (let k in SETTINGS) r[k] = u.get('gately', 'gately', k) || SETTINGS[k];
+        u.load('gately_plus');
+        for (let k in SETTINGS) r[k] = u.get('gately_plus', 'gately', k) || SETTINGS[k];
         return r;
     },
 
     save_settings: (a) => {
         if (!ensureUciSection()) return { result: 'error', msg: 'uci_set_failed' };
+
+        // 路径类设置必须是非空绝对路径。空值会让服务带着 -c '' / 空可执行路径启动，
+        // 表现为“设置没生效”甚至起不来，所以在写 uci 之前就挡掉。
+        for (let k in ['binpath', 'configdir']) {
+            if (a[k] === null) continue;
+            let v = trim(`${a[k]}`);
+            if (!length(v) || substr(v, 0, 1) !== '/')
+                return { result: 'error', msg: `${k}_invalid` };
+            a[k] = v;
+        }
 
         // 管理员密码：不在 SETTINGS（不写入 uci）。
         // 留空/缺省 => 保持原密码；非空 => 必须 ≥8 位且 account.json 已存在。
@@ -379,6 +389,11 @@ const api = {
             if (!scheduleServiceAction('reload'))
                 return { result: 'error', msg: 'service_action_failed' };
         }
+
+        // 改了二进制路径但新位置还没有文件：保存照做，只提醒（用户可能打算稍后下载）
+        if (a.binpath !== null && !exists(trim(`${a.binpath}`)))
+            return { result: 'ok', warn: 'binary_missing' };
+
         return { result: 'ok' };
     },
 
