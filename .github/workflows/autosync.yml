@@ -84,7 +84,7 @@ jobs:
           "https://github.com/kenzok8/small-package|main|dirs|wrtbwmon luci-app-wrtbwmon|"         
           "https://github.com/destan19/OpenAppFilter|master|dirs|oaf luci-app-oaf open-app-filter|"
           "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
-          "https://github.com/Yunhair/luci-app-gately|main|dirs|luci-app-gately|"
+          "https://github.com/Yunhair/luci-app-gately-plus|main|dirs|luci-app-gately-plus|"
           
           "https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|dirs|luci-app-tailscale-community|"
 
