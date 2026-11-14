@@ -85,8 +85,7 @@ jobs:
           "https://github.com/destan19/OpenAppFilter|master|dirs|oaf luci-app-oaf open-app-filter|"
           "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
           "https://github.com/whzhni1/luci-app-tailscale|main|dirs|luci-app-tailscale|"
-          "https://github.com/Yunhair/luci-app-gately-plus|main|dirs|luci-app-gately-plus|"
-          
+          "https://github.com/Yunhair/luci-app-gately-plus|main|dirs|luci-app-gately-plus|"          
           "https://github.com/Tokisaki-Galaxy/luci-app-tailscale-community|master|dirs|luci-app-tailscale-community|"
 
           
@@ -97,7 +96,6 @@ jobs:
           "https://github.com/eamonxg/luci-app-aurora-config|master|full| |luci-app-aurora-config"
           "https://github.com/UnblockNeteaseMusic/luci-app-unblockneteasemusic|js|full| |luci-app-unblockneteasemusic"
           "https://github.com/zzsj0928/luci-app-pushbot|master|full| |luci-app-pushbot"
-          "https://github.com/szwjp/luci-app-homeproxy-pro|main|full| |luci-app-homeproxy-pro"
           "https://github.comrabbitrogi/luci-app-zerotier|main|full| |luci-app-zerotier"
 
 
