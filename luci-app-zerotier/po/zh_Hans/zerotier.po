@@ -1,0 +1,463 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-zerotier\n"
+"PO-Revision-Date: 2026-07-23 22:15+0800\n"
+"Last-Translator: Aimee <aimee@github.com>\n"
+"Language-Team: Chinese Simplified\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Action"
+msgstr "操作"
+
+msgid "Actions"
+msgstr "操作"
+
+msgid "Add & Authorize"
+msgstr "添加并授权"
+
+msgid "Add Member Manually"
+msgstr "手动添加成员"
+
+msgid "Add Route"
+msgstr "添加路由"
+
+msgid "All Members"
+msgstr "全部成员"
+
+msgid "Allow DNS"
+msgstr "允许 DNS"
+
+msgid "Allow ZeroTier to set DNS servers."
+msgstr "允许 ZeroTier 设置 DNS 服务器。"
+
+msgid "Allow ZeroTier to set IP addresses and routes (local/private ranges only)."
+msgstr "允许 ZeroTier 设置 IP 地址和路由（仅限本地/私有地址范围）。"
+
+msgid "Allow ZeroTier to set global/public/not-private range IPs and routes."
+msgstr "允许 ZeroTier 设置全局/公共/非私有地址范围的 IP 和路由。"
+
+msgid "Allow ZeroTier to set the default route on the system."
+msgstr "允许 ZeroTier 设置系统默认路由。"
+
+msgid "Allow default route"
+msgstr "允许默认路由"
+
+msgid "Allow forward"
+msgstr "允许转发"
+
+msgid "Allow forward traffic from/to the ZeroTier network."
+msgstr "允许来自或发往 ZeroTier 网络的转发流量。"
+
+msgid "Allow global IP/route"
+msgstr "允许全局 IP/路由"
+
+msgid "Allow input"
+msgstr "允许入站"
+
+msgid "Allow input traffic"
+msgstr "允许入站流量"
+
+msgid "Allow input traffic from the ZeroTier network."
+msgstr "允许来自 ZeroTier 网络的入站流量。"
+
+msgid "Allow input traffic to the ZeroTier daemon."
+msgstr "允许外部流量进入 ZeroTier 守护进程。"
+
+msgid "Allow managed IP/route"
+msgstr "允许托管 IP/路由"
+
+msgid "Assigned IP"
+msgstr "分配的 IP"
+
+msgid "Changing the pool updates its direct managed route. Existing member IP assignments are kept until changed manually or reassigned by the Controller."
+msgstr "修改地址池会同时更新其直连托管路由。现有成员的 IP 分配将保留，直至手动修改或由 Controller 重新分配。"
+
+msgid "Enter a valid IPv4 CIDR using a prefix between /8 and /30."
+msgstr "请输入有效的 IPv4 CIDR，前缀长度须介于 /8 与 /30 之间。"
+
+msgid "Host addresses are accepted and normalized automatically, for example 10.16.0.1/24 becomes 10.16.0.0/24."
+msgstr "支持输入主机地址并自动规范化，例如 10.16.0.1/24 会转换为 10.16.0.0/24。"
+
+msgid "IP pool updated to "
+msgstr "IP 地址池已更新为 "
+
+msgid "Managed IPv4 Pool"
+msgstr "托管 IPv4 地址池"
+
+msgid "Network CIDR:"
+msgstr "网络 CIDR："
+
+msgid "Network: %s · Assignable: %s - %s"
+msgstr "网络：%s · 可分配范围：%s - %s"
+
+msgid "No managed IPv4 pool is configured."
+msgstr "尚未配置托管 IPv4 地址池。"
+
+msgid "Save IP Pool"
+msgstr "保存 IP 地址池"
+
+msgid "Authorize"
+msgstr "授权"
+
+msgid "Authorized"
+msgstr "已授权"
+
+msgid "Client secret"
+msgstr "客户端密钥"
+
+msgid "Collecting data…"
+msgstr "正在收集数据…"
+
+msgid "Config path"
+msgstr "配置路径"
+
+msgid "Configuration"
+msgstr "配置"
+
+msgid "Connection"
+msgstr "连接"
+
+msgid "Controller"
+msgstr "控制器"
+
+msgid "Controller Active"
+msgstr "控制器已就绪"
+
+msgid "Controller Unavailable"
+msgstr "控制器不可用"
+
+msgid "Controller did not return a network ID"
+msgstr "控制器未返回网络 ID"
+
+msgid "Controller node"
+msgstr "控制器节点"
+
+msgid "Controller request failed"
+msgstr "控制器请求失败"
+
+msgid "Copy config path"
+msgstr "复制配置目录"
+
+msgid "Copy the contents of the persistent configuration directory to memory instead of linking it, this avoids writing to flash."
+msgstr "将持久配置目录的内容复制到内存而不是创建链接，以避免写入闪存。"
+
+msgid "Create Network"
+msgstr "创建网络"
+
+msgid "Create New Network"
+msgstr "创建新网络"
+
+msgid "Create or manage your ZeroTier network, and auth clients who could access."
+msgstr "创建或管理 ZeroTier 网络，并授权允许接入的客户端。"
+
+msgid "Created network: "
+msgstr "已创建网络："
+
+msgid "Deauth"
+msgstr "取消授权"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Delete Route"
+msgstr "删除路由"
+
+msgid "Delete member "
+msgstr "删除成员 "
+
+msgid "Direct"
+msgstr "直连"
+
+msgid "Dismiss"
+msgstr "关闭"
+
+msgid "Empty response from controller service"
+msgstr "控制器服务返回了空响应"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Enable network address and port translation (NAT) for outbound traffic for this network."
+msgstr "为此网络的出站流量启用网络地址和端口转换（NAT）。"
+
+msgid "Export Backup (JSON)"
+msgstr "导出备份（JSON）"
+
+msgid "Forward interfaces"
+msgstr "转发接口"
+
+msgid "Global configuration"
+msgstr "全局配置"
+
+msgid "IP Pool: "
+msgstr "IP 地址池："
+
+msgid "IPv4 Address"
+msgstr "IPv4 地址"
+
+msgid "IPv6 Address"
+msgstr "IPv6 地址"
+
+msgid "Import Backup"
+msgstr "导入备份"
+
+msgid "Import JSON Backup"
+msgstr "导入 JSON 备份"
+
+msgid "Interface info"
+msgstr "接口信息"
+
+msgid "Interface Name"
+msgstr "接口名称"
+
+msgid "Leave empty for all."
+msgstr "留空表示全部。"
+
+msgid "Listen port"
+msgstr "监听端口"
+
+msgid "Loading network details for "
+msgstr "正在加载网络详情："
+
+msgid "Local config path"
+msgstr "本地配置路径"
+
+msgid "MAC Address"
+msgstr "MAC 地址"
+
+msgid "MTU"
+msgstr "MTU"
+
+msgid "Managed Networks"
+msgstr "托管网络"
+
+msgid "Masquerade interfaces"
+msgstr "地址伪装接口"
+
+msgid "Masquerading"
+msgstr "IP 动态伪装"
+
+msgid "NOT RUNNING"
+msgstr "未运行"
+
+msgid "Name / Note"
+msgstr "名称 / 备注"
+
+msgid "Name / Note:"
+msgstr "名称 / 备注："
+
+msgid "Network ID"
+msgstr "网络 ID"
+
+msgid "Network Interface Information"
+msgstr "网络接口信息"
+
+msgid "Network Members ("
+msgstr "网络成员（"
+
+msgid "Network Name"
+msgstr "网络名称"
+
+msgid "Network backup restored successfully."
+msgstr "网络备份恢复成功。"
+
+msgid "Network configuration"
+msgstr "网络配置"
+
+msgid "No interface online."
+msgstr "没有在线接口。"
+
+msgid "No networks created yet."
+msgstr "尚未创建网络。"
+
+msgid "Node ID"
+msgstr "节点 ID"
+
+msgid "Node ID (10 chars):"
+msgstr "节点 ID（10 位）："
+
+msgid "Node ID must be 10 characters."
+msgstr "节点 ID 必须为 10 位字符。"
+
+msgid "Node Offline"
+msgstr "节点离线"
+
+msgid "Node Online"
+msgstr "节点在线"
+
+msgid "Offline"
+msgstr "离线"
+
+msgid "Offline Only"
+msgstr "仅离线"
+
+msgid "Online "
+msgstr "在线 "
+
+msgid "Online Only"
+msgstr "仅在线"
+
+msgid "Open website"
+msgstr "打开网站"
+
+msgid "Operation failed: "
+msgstr "操作失败："
+
+msgid "Path of the optional file local.conf (see <a target=\"_blank\" href=\"%s\">documentation</a>)."
+msgstr "可选配置文件 local.conf 的路径（请参阅<a target=\"_blank\" href=\"%s\">文档</a>）。"
+
+msgid "Pending"
+msgstr "待授权"
+
+msgid "Persistent configuration directory (to keep other configurations such as controller or moons, etc.)."
+msgstr "持久配置目录（用于保留控制器、Moon 等其他配置）。"
+
+msgid "Please select a JSON backup file."
+msgstr "请选择 JSON 备份文件。"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Routes Configuration"
+msgstr "路由配置"
+
+msgid "RUNNING"
+msgstr "运行中"
+
+msgid "Search Node ID, Name, or IP..."
+msgstr "搜索节点 ID、名称或 IP…"
+
+msgid "Search:"
+msgstr "搜索："
+
+msgid "Select a network from the sidebar to view members and configuration."
+msgstr "从侧栏选择网络以查看成员和配置。"
+
+msgid "Self-hosted network, member and route management for this router."
+msgstr "管理此路由器自托管的网络、成员和路由。"
+
+msgid "Set Name"
+msgstr "设置名称"
+
+msgid "Status"
+msgstr "状态"
+
+msgid "Status:"
+msgstr "状态："
+
+msgid "Target CIDR"
+msgstr "目标 CIDR"
+
+msgid "Target CIDR:"
+msgstr "目标 CIDR："
+
+msgid "This ZeroTier build does not include the embedded Controller API."
+msgstr "此 ZeroTier 构建未包含内置控制器 API。"
+
+msgid "Total Download"
+msgstr "总下载"
+
+msgid "Total Upload"
+msgstr "总上传"
+
+msgid "Unable to get interface %s info: %s."
+msgstr "无法获取接口 %s 的信息：%s。"
+
+msgid "Unable to get interface info: %s."
+msgstr "无法获取接口信息：%s。"
+
+msgid "Unavailable"
+msgstr "不可用"
+
+msgid "Via Gateway"
+msgstr "经由网关"
+
+msgid "Via Gateway (Optional):"
+msgstr "经由网关（可选）："
+
+msgid "ZeroTier"
+msgstr "ZeroTier"
+
+msgid "ZeroTier Central"
+msgstr "ZeroTier 管理中心"
+
+msgid "ZeroTier Controller"
+msgstr "ZeroTier 控制器"
+
+msgid "ZeroTier is an open source, cross-platform and easy to use virtual LAN."
+msgstr "ZeroTier 是一个开源、跨平台且易于使用的虚拟局域网。"
+
+msgid "e.g. 10.x.y.z"
+msgstr "例如 10.x.y.z"
+
+msgid "network"
+msgstr "个网络"
+
+msgid "networks"
+msgstr "个网络"
+
+msgid "Member added and authorized."
+msgstr "成员已添加并授权。"
+
+msgid "Network Name:"
+msgstr "网络名称："
+
+msgid "No routes configured."
+msgstr "尚未配置路由。"
+
+msgid "Node ID must be 10 hexadecimal characters."
+msgstr "节点 ID 必须为 10 位十六进制字符。"
+
+msgid "None"
+msgstr "无"
+
+msgid "Target CIDR is required."
+msgstr "目标 CIDR 不能为空。"
+
+msgid "Unnamed Network"
+msgstr "未命名网络"
+
+msgid "Latency"
+msgstr "延迟"
+
+msgid "Optional"
+msgstr "可选"
+
+msgid "Preassigned IP (Optional):"
+msgstr "预分配 IP（可选）："
+
+msgid "Name and IP are optional. The member is authorized immediately."
+msgstr "名称和 IP 均可留空；成员将立即授权。"
+
+msgid "Enter a valid IPv4 address."
+msgstr "请输入有效的 IPv4 地址。"
+
+msgid "Network join QR code"
+msgstr "网络加入二维码"
+
+msgid "Scan to join"
+msgstr "扫码加入"
+
+msgid "Scan with the ZeroTier app to join this network."
+msgstr "使用 ZeroTier App 扫码加入此网络。"
+
+msgid "Restore (overwrite, keep original network ID)"
+msgstr "恢复（覆盖，保留原网络 ID）"
+
+msgid "Migrate (new network ID on this controller)"
+msgstr "迁移（在本控制器生成新网络 ID）"
+
+msgid "Restore keeps the original network ID and only works on the controller that created the backup. Migrate imports the backup as a new network under this controller."
+msgstr "恢复模式保留原网络 ID，仅适用于生成该备份的控制器；迁移模式会将备份导入为本控制器上的新网络。"
+
+msgid "Backup migrated to new network %s (from %s)."
+msgstr "备份已迁移为新网络 %s（原网络 %s）。"
+
+msgid "Failed at member %s (%d of %d imported)."
+msgstr "成员 %s 导入失败（已导入 %d/%d）。"
+
+msgid "unknown error"
+msgstr "未知错误"

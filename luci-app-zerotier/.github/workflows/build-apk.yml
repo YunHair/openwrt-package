@@ -1,0 +1,343 @@
+name: Build ImmortalWrt LuCI Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      sdk_base_url:
+        description: ImmortalWrt SDK target directory URL
+        required: true
+        default: https://downloads.immortalwrt.org/releases/25.12-SNAPSHOT/targets/x86/64
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ImmortalWrt 25.12 x86_64 LuCI
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Select SDK source
+        env:
+          INPUT_SDK_BASE_URL: ${{ github.event.inputs.sdk_base_url }}
+        run: |
+          sdk_base_url="$INPUT_SDK_BASE_URL"
+          if [ -z "$sdk_base_url" ]; then
+            sdk_base_url="https://downloads.immortalwrt.org/releases/25.12-SNAPSHOT/targets/x86/64"
+          fi
+          echo "SDK_BASE_URL=${sdk_base_url%/}" >> "$GITHUB_ENV"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang flex bison g++ gawk gcc-multilib gettext git \
+            libncurses-dev libssl-dev python3 rsync unzip zlib1g-dev file wget \
+            curl jq zstd cmake pkg-config libjson-c-dev
+
+      - name: Build ucode runtime for tests
+        run: |
+          # The rpcd adapter prefers a ucode engine at runtime; build the real
+          # interpreter (core + fs module only) so the test suite can exercise
+          # the ucode implementation instead of only the shell fallback.
+          git clone --depth 1 https://github.com/jow-/ucode.git "$RUNNER_TEMP/ucode"
+          cmake -S "$RUNNER_TEMP/ucode" -B "$RUNNER_TEMP/ucode/build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DFS_SUPPORT=ON \
+            -DDEBUG_SUPPORT=OFF -DIO_SUPPORT=OFF -DMATH_SUPPORT=OFF \
+            -DUBUS_SUPPORT=OFF -DUCI_SUPPORT=OFF -DRTNL_SUPPORT=OFF \
+            -DNL80211_SUPPORT=OFF -DRESOLV_SUPPORT=OFF -DSTRUCT_SUPPORT=OFF \
+            -DULOOP_SUPPORT=OFF -DLOG_SUPPORT=OFF -DSOCKET_SUPPORT=OFF \
+            -DZLIB_SUPPORT=OFF -DDIGEST_SUPPORT=OFF
+          cmake --build "$RUNNER_TEMP/ucode/build" --parallel
+          sudo cmake --install "$RUNNER_TEMP/ucode/build"
+          sudo ldconfig
+          ucode -e 'import { mkdtemp, writefile, unlink, rmdir } from "fs"; print("ucode runtime ready\n");'
+
+      - name: Validate LuCI and rpcd source
+        run: |
+          sh -n root/usr/libexec/rpcd/zerotier-controller
+          sh -n tests/test-rpcd-ip-pool.sh
+          sh -n tests/fixtures/mock-curl
+          sh -n tests/fixtures/mock-ucode
+          node --check htdocs/luci-static/resources/view/zerotier/controller.js
+          node --check htdocs/luci-static/resources/zerotier/qrcode.js
+          node -e 'const fs=require("fs"); const source=fs.readFileSync("htdocs/luci-static/resources/zerotier/qrcode.js","utf8"); const mockL={Class:{extend: function(obj){ return obj; }}}; const mod=new Function("L", "Class", source)(mockL, mockL.Class); const qr=mod.create(0,"M"); qr.addData("4ab50a5631fd3edd"); qr.make(); const svg=qr.createSvgTag(4,3); if (!svg.includes("<svg") || qr.getModuleCount()<21) throw new Error("QR generator validation failed");'
+          node -e 'const fs=require("fs"); const src=fs.readFileSync("root/usr/libexec/rpcd/zerotier-controller.ucode","utf8"); if (src.includes("from '\''os'\''") || src.includes("function lc(") || /\b(?:rand|strftime)\s*\(/.test(src) || /ARGV\[2\]/.test(src) || /\+\s*\{/.test(src)) throw new Error("Unsupported ucode pattern found");'
+          jq -e . root/usr/share/rpcd/acl.d/luci-app-zerotier.json >/dev/null
+          msgfmt --check --check-format -o /dev/null po/zh_Hans/zerotier.po
+          tests/test-rpcd-ip-pool.sh
+
+      - name: Resolve SDK release metadata
+        run: |
+          # The primary download server occasionally throttles to a few hundred
+          # KB/s; keep a list of mirrors that carry the same release tree and
+          # resolve filename + checksum from whichever source answers first.
+          {
+            printf '%s\n' "$SDK_BASE_URL"
+            case "$SDK_BASE_URL" in
+              https://downloads.immortalwrt.org/*)
+                suffix="${SDK_BASE_URL#https://downloads.immortalwrt.org/}"
+                printf '%s\n' \
+                  "https://mirror.nju.edu.cn/immortalwrt/$suffix" \
+                  "https://mirrors.sjtug.sjtu.edu.cn/immortalwrt/$suffix" \
+                  "https://mirrors.pku.edu.cn/immortalwrt/$suffix"
+                ;;
+            esac
+          } > sdk-mirrors.txt
+
+          sdk_resolved_base=""
+          while IFS= read -r base; do
+            echo "Trying SDK source: $base"
+            if curl -fsSL --retry 2 --max-time 90 "$base/sha256sums" -o sdk.sha256sums; then
+              sdk_resolved_base="$base"
+              break
+            fi
+          done < sdk-mirrors.txt
+          if [ -z "$sdk_resolved_base" ]; then
+            echo "Unable to fetch sha256sums from any SDK source" >&2
+            exit 1
+          fi
+
+          sdk_filename="$(grep -oE 'immortalwrt-sdk-[^ *]*x86-64[^ *]*\.tar\.zst' sdk.sha256sums | sed -n '1p')"
+          if [ -z "$sdk_filename" ]; then
+            echo "No x86_64 ImmortalWrt SDK listed in sha256sums from $sdk_resolved_base" >&2
+            exit 1
+          fi
+          expected_sha256="$(awk -v file="$sdk_filename" '$2 == file || $2 == "*" file { print $1 }' sdk.sha256sums)"
+          if [ -z "$expected_sha256" ]; then
+            echo "SDK checksum not found for $sdk_filename" >&2
+            exit 1
+          fi
+
+          echo "Resolved $sdk_filename ($expected_sha256) via $sdk_resolved_base"
+          {
+            echo "SDK_RESOLVED_BASE=$sdk_resolved_base"
+            echo "SDK_FILENAME=$sdk_filename"
+            echo "SDK_SHA256=$expected_sha256"
+          } >> "$GITHUB_ENV"
+
+      - name: Cache SDK archive
+        id: cache-sdk
+        uses: actions/cache@v6
+        with:
+          path: sdk.tar.zst
+          key: sdk-tarball-${{ env.SDK_SHA256 }}
+
+      - name: Download ImmortalWrt SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          # Abort any source that stays under 1 MB/s for a minute and move on
+          # to the next mirror instead of crawling for half an hour.
+          downloaded=""
+          for base in "$SDK_RESOLVED_BASE" $(grep -Fxv "$SDK_RESOLVED_BASE" sdk-mirrors.txt || true); do
+            echo "Downloading SDK from $base"
+            rm -f sdk.tar.zst
+            if curl -fL --retry 1 --speed-limit 1048576 --speed-time 60 "$base/$SDK_FILENAME" -o sdk.tar.zst &&
+               echo "$SDK_SHA256  sdk.tar.zst" | sha256sum -c -; then
+              downloaded=1
+              break
+            fi
+          done
+          if [ -z "$downloaded" ]; then
+            echo "SDK download failed from all sources" >&2
+            exit 1
+          fi
+
+      - name: Verify and extract SDK
+        run: |
+          echo "$SDK_SHA256  sdk.tar.zst" | sha256sum -c -
+          tar --zstd -xf sdk.tar.zst
+          sdk_dir="$(find . -maxdepth 1 -type d -name 'immortalwrt-sdk-*' -print -quit)"
+          if [ -z "$sdk_dir" ]; then
+            echo "Extracted SDK directory not found" >&2
+            exit 1
+          fi
+          mv "$sdk_dir" sdk
+
+      - name: Install LuCI build feeds
+        working-directory: sdk
+        run: |
+          # Install package metadata for runtime dependency resolution and only
+          # the LuCI host tools required to build the application packages.
+          # The ZeroTier daemon and embedded Controller binary are not compiled.
+          ./scripts/feeds update base packages luci
+          ./scripts/feeds install -p base lua
+          ./scripts/feeds install -p packages zerotier luasrcdiet
+          ./scripts/feeds install -p luci luci-base csstidy
+
+          # Buildroot embeds an md5 of each package dir (paths + mtimes) in
+          # its .prepared stamp file name. Freshly cloned feeds get clone-time
+          # mtimes, which would rename every stamp and defeat the restored
+          # build cache, so pin the whole feed tree to a fixed timestamp.
+          find feeds/ -type f -exec touch -d '2020-01-01 00:00:00 UTC' {} +
+
+      - name: Add LuCI package to SDK
+        run: |
+          if [ -L sdk/package/feeds/luci/luci-app-zerotier ]; then
+            rm sdk/package/feeds/luci/luci-app-zerotier
+          fi
+
+          mkdir -p sdk/package/luci-app-zerotier
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='sdk' \
+            --exclude='output' \
+            ./ sdk/package/luci-app-zerotier/
+
+          # Strip the zerotier runtime dependency from the SDK copy only (the
+          # repo Makefile keeps it): otherwise defconfig selects zerotier and
+          # the SDK compiles its whole target closure (iproute2, iptables,
+          # ZeroTierOne, ...) that never enters the published artifacts. As a
+          # bonus the sideloaded apk no longer hard-depends on zerotier, so
+          # apk cannot auto-install the official non-Controller build over a
+          # manually installed ZT_NONFREE one.
+          sed -i 's/^LUCI_DEPENDS:=+zerotier +curl +jq$/LUCI_DEPENDS:=+curl +jq/' sdk/package/luci-app-zerotier/Makefile
+          if ! grep -q '^LUCI_DEPENDS:=+curl +jq$' sdk/package/luci-app-zerotier/Makefile; then
+            echo "Failed to strip the zerotier dependency from the SDK copy" >&2
+            exit 1
+          fi
+
+      - name: Configure LuCI packages
+        working-directory: sdk
+        run: |
+          embedded_package_defaults="$(awk '/^config PACKAGE_/ { count++ } END { print count + 0 }' Config-build.in)"
+          echo "Removing $embedded_package_defaults embedded SDK package defaults"
+          sed -i '/^config PACKAGE_/,/^$/d' Config-build.in
+          if grep -q '^config PACKAGE_' Config-build.in; then
+            echo "Failed to remove embedded SDK package defaults" >&2
+            exit 1
+          fi
+
+          printf '%s\n' \
+            '# CONFIG_ALL is not set' \
+            '# CONFIG_ALL_KMODS is not set' \
+            '# CONFIG_ALL_NONSHARED is not set' \
+            '# CONFIG_AUTOREMOVE is not set' \
+            '# CONFIG_AUTOREBUILD is not set' \
+            'CONFIG_PACKAGE_luci-app-zerotier=m' \
+            'CONFIG_PACKAGE_luci-i18n-zerotier-zh-cn=m' > .config
+          make defconfig
+
+          if grep -qE '^CONFIG_ALL(_(KMODS|NONSHARED))?=[ym]$' .config; then
+            echo "SDK broad package selectors are still enabled" >&2
+            exit 1
+          fi
+          if grep -q '^CONFIG_AUTOREMOVE=y$' .config; then
+            echo "SDK build directory cleanup is still enabled" >&2
+            exit 1
+          fi
+          # With AUTOREBUILD disabled the restored dependency build state is
+          # trusted as-is; luci-app-zerotier itself is still rebuilt every run
+          # via the explicit package clean in the build step.
+          if grep -q '^CONFIG_AUTOREBUILD=y$' .config; then
+            echo "SDK timestamp-based rebuild tracking is still enabled" >&2
+            exit 1
+          fi
+
+          for package in luci-app-zerotier luci-i18n-zerotier-zh-cn; do
+            if ! grep -q "^CONFIG_PACKAGE_${package}=m$" .config; then
+              echo "Expected CONFIG_PACKAGE_${package}=m" >&2
+              exit 1
+            fi
+          done
+
+          if grep -q '^CONFIG_PACKAGE_zerotier=[ym]$' .config; then
+            echo "zerotier target package must not be selected in the LuCI-only build" >&2
+            exit 1
+          fi
+
+          selected_packages="$(awk '/^CONFIG_PACKAGE_.*=[ym]$/ { count++ } END { print count + 0 }' .config)"
+          echo "Selected packages ($selected_packages):"
+          if [ "$selected_packages" -gt 128 ]; then
+            grep -E '^CONFIG_PACKAGE_.*=[ym]$' .config | sed -n '1,128p'
+            echo "Refusing broad build: $selected_packages packages are selected" >&2
+            exit 1
+          fi
+          grep -E '^CONFIG_PACKAGE_.*=[ym]$' .config
+
+      - name: Cache SDK build state
+        uses: actions/cache@v6
+        with:
+          path: |
+            sdk/build_dir
+            sdk/staging_dir
+            sdk/dl
+          key: sdk-build-v3-${{ env.SDK_SHA256 }}
+
+      - name: Build LuCI application and Simplified Chinese translation
+        working-directory: sdk
+        run: |
+          make package/feeds/luci/luci-base/host/compile V=s -j"$(nproc)"
+          for tool in jsmin po2lmo; do
+            if ! find staging_dir -type f -path "*/bin/$tool" -perm -111 -print -quit | grep -q .; then
+              echo "Required LuCI host tool not found: $tool" >&2
+              exit 1
+            fi
+          done
+
+          make package/luci-app-zerotier/clean
+          make package/luci-app-zerotier/compile V=s -j"$(nproc)"
+
+      - name: Collect and verify artifacts
+        run: |
+          mkdir -p output
+
+          collect_one() {
+            pattern="$1"
+            label="$2"
+            mapfile -d '' matches < <(find sdk/bin/packages -type f -name "$pattern" -print0)
+            if [ "${#matches[@]}" -ne 1 ]; then
+              echo "Expected exactly one $label APK, found ${#matches[@]}" >&2
+              find sdk/bin/packages -type f -name '*.apk' -print >&2
+              exit 1
+            fi
+            cp "${matches[0]}" output/
+          }
+
+          collect_one 'luci-app-zerotier-[0-9]*.apk' 'LuCI application'
+          collect_one 'luci-i18n-zerotier-zh-cn-[0-9]*.apk' 'Simplified Chinese translation'
+
+          if find output -maxdepth 1 -type f -name 'zerotier-[0-9]*.apk' | grep -q .; then
+            echo "ZeroTier daemon package must not be part of this LuCI-only build" >&2
+            exit 1
+          fi
+
+          printf '%s\n' \
+            "SDK: $SDK_FILENAME" \
+            "SDK source: $SDK_BASE_URL" \
+            "SDK download source: $SDK_RESOLVED_BASE" \
+            "Target: ImmortalWrt 25.12 x86/64" \
+            "Build scope: LuCI application and Simplified Chinese translation only" \
+            "ZeroTier daemon/Controller binary: not built (runtime dependency stripped in CI)" \
+            "Packages: luci-app-zerotier, luci-i18n-zerotier-zh-cn" > output/BUILD-INFO.txt
+
+          (
+            cd output
+            sha256sum BUILD-INFO.txt *.apk > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+          ls -lh output
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: immortalwrt-25.12-x86_64-luci-zerotier
+          path: output/*
+          if-no-files-found: error
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: output/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

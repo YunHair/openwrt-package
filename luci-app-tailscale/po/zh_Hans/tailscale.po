@@ -1,0 +1,1239 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-tailscale 2.0.0\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "%d days"
+msgstr "%d天"
+
+msgid "1 day"
+msgstr "1天"
+
+msgid "Accept subnet routes"
+msgstr "接受子网路由"
+
+msgid "Accept tailnet DNS"
+msgstr "接受 Tailnet DNS"
+
+msgid "Add subnet"
+msgstr "添加网段"
+
+msgid "Address for Tailscale's outbound HTTP proxy listener; leave empty to disable."
+msgstr "Tailscale 出站 HTTP 代理监听地址；留空禁用。"
+
+msgid "Adjust TCP maximum segment size to reduce path-MTU problems across the tunnel."
+msgstr "调整 TCP 最大报文段长度，以减少隧道传输中的路径 MTU 问题。"
+
+msgid "Advertise as exit node"
+msgstr "宣告为出口节点"
+
+msgid "Advertise LAN subnets connected to this router. Remote devices also need to accept subnet routes, and each route may need admin approval."
+msgstr "发布连接到本路由器的 LAN 子网。远端设备也必须启用接收子网路由，且每条路由可能需要管理员批准。"
+
+msgid "Advertise subnet routes"
+msgstr "宣告子网路由"
+
+msgid "Advertise this device as an internet exit node for other tailnet devices. Approval may be required in the admin console."
+msgstr "将本设备发布为其他 Tailnet 设备的互联网出口节点；可能还需在管理控制台批准。"
+
+msgid "All"
+msgstr "全部"
+
+msgid "All N nodes shown"
+msgstr "共 N 台，全部显示"
+
+msgid "Allow devices on this router's LAN to initiate connections to tailnet peers."
+msgstr "允许本路由器 LAN 内的设备主动连接 Tailnet 节点。"
+
+msgid "Allow forwarding from the WAN toward Tailscale. This increases exposure and should only be enabled with an explicit firewall policy."
+msgstr "允许从 WAN 向 Tailscale 转发流量，会增加暴露风险；仅应在明确配置防火墙策略后启用。"
+
+msgid "Allow LAN bypass on exit node"
+msgstr "出口节点允许 LAN 直连"
+
+msgid "Allow tailnet devices to forward internet-bound traffic through this router."
+msgstr "允许 Tailnet 设备经本路由器转发互联网流量。"
+
+msgid "Allow tailnet devices to initiate connections to devices on this router's LAN."
+msgstr "允许 Tailnet 设备主动连接本路由器 LAN 内的设备。"
+
+msgid "Allow tailnet peers to connect to this device using Tailscale SSH, subject to the tailnet access policy."
+msgstr "允许 Tailnet 节点通过 Tailscale SSH 连接本设备，实际访问仍受 Tailnet 访问策略限制。"
+
+msgid "Allow this device to install subnet routes advertised by other tailnet nodes. The routes must also be approved by an administrator."
+msgstr "允许本设备安装 Tailnet 其他节点发布的子网路由；路由还必须由管理员在管理控制台批准。"
+
+msgid "Allow this local account to control Tailscale without sudo."
+msgstr "允许此本地账户不使用 sudo 管理 Tailscale。"
+
+msgid "Applied"
+msgstr "已应用"
+
+msgid "Applied, service restarting"
+msgstr "已应用，服务重启中"
+
+msgid "Apply failed"
+msgstr "应用失败"
+
+msgid "Apply source NAT to traffic forwarded to advertised subnets, so destination LAN devices see the router as the source."
+msgstr "对转发到已发布子网的流量执行源地址转换，使目标 LAN 设备看到的来源为本路由器。"
+
+msgid "Apply timed out, check status"
+msgstr "应用超时，请检查状态"
+
+msgid "Arch"
+msgstr "架构"
+
+msgid "Use auto to detect the architecture, or specify it manually, for example x86_64 or mips-hardfloat."
+msgstr "auto 自动识别，或手动指定，例如 x86_64 或 mips-hardfloat。"
+
+msgid "At time"
+msgstr "执行时间"
+
+msgid "Auto"
+msgstr "自动"
+
+msgid "Auto (Tailscale chooses)"
+msgstr "自动（由 Tailscale 选择）"
+
+msgid "Auto lets Tailscale choose. A selected region is preferred only when a connection needs DERP; direct connections remain direct."
+msgstr "自动模式由 Tailscale 选择。仅在连接需要 DERP 中继时优先使用所选地区；直连不受影响。"
+
+msgid "Backend commands"
+msgstr "后端命令"
+
+msgid "Basic settings"
+msgstr "基本设置"
+
+msgid "Binary"
+msgstr "二进制"
+
+msgid "Binary check failed"
+msgstr "二进制检查失败"
+
+msgid "Boot delay"
+msgstr "启动延迟"
+
+msgid "Busy, try later"
+msgstr "忙，请稍后再试"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Cancel task"
+msgstr "取消任务"
+
+msgid "Cancelled"
+msgstr "已取消"
+
+msgid "Check update"
+msgstr "检查更新"
+
+msgid "Checksum mismatch"
+msgstr "校验和不匹配"
+
+msgid "Checksum unavailable"
+msgstr "缺少校验和"
+
+msgid "Choose a directly connected LAN subnet, or enter a CIDR manually."
+msgstr "从本地直连/LAN 路由中选择网段，也可手动输入 CIDR。"
+
+msgid "Select one or more LAN subnets; enter additional CIDR routes separated by commas."
+msgstr "可多选 LAN 子网；其他 CIDR 路由请用逗号分隔输入。"
+
+msgid "Use Ctrl or Command to select multiple LAN subnets; enter one CIDR per custom input."
+msgstr "按住 Ctrl 或 Command 可多选 LAN 子网；每个自定义输入框填写一个 CIDR。"
+
+msgid "Additional CIDR routes"
+msgstr "其他 CIDR 路由"
+
+msgid "Manual add subnet"
+msgstr "手动添加"
+
+msgid "Add"
+msgstr "添加"
+
+msgid "No directly connected LAN subnets found"
+msgstr "未发现直连 LAN 子网"
+
+msgid "No exit nodes available"
+msgstr "没有可用的出口节点"
+
+msgid "Use Ctrl or Command to select multiple local subnets."
+msgstr "按住 Ctrl 或 Command 可多选本地子网。"
+
+msgid "Choose whether applying settings replaces a zone with the same name or leaves the existing zone unchanged."
+msgstr "应用设置时，选择替换同名区域，或保留现有区域不变。"
+
+msgid "Clear logs"
+msgstr "清空日志"
+
+msgid "Clear logs failed"
+msgstr "清空日志失败"
+
+msgid "Click to install core"
+msgstr "点击前往安装内核"
+
+msgid "Click to login"
+msgstr "点击扫码登录"
+
+msgid "Click to manage core"
+msgstr "点击管理内核"
+
+msgid "Close"
+msgstr "关闭"
+
+msgid "Cloudflare R2"
+msgstr "Cloudflare R2"
+
+msgid "Completed"
+msgstr "已完成"
+
+msgid "Confirm logout?"
+msgstr "确认注销？"
+
+msgid "Control server for this device. Leave empty for the official Tailscale control plane, or enter a Headscale URL."
+msgstr "本设备使用的控制服务器。留空使用官方 Tailscale 控制平面，或填写 Headscale 地址。"
+
+msgid "Copied"
+msgstr "已复制"
+
+msgid "Copy"
+msgstr "复制"
+
+msgid "Copy IP"
+msgstr "复制 IP"
+
+msgid "Core"
+msgstr "内核"
+
+msgid "Tailscale core updated"
+msgstr "Tailscale 核心已更新"
+
+msgid "Core missing"
+msgstr "内核不存在"
+
+msgid "Core version"
+msgstr "内核版本"
+
+msgid "Create a netifd interface for the Tailscale tunnel device so it can be used by firewall zones."
+msgstr "为 Tailscale 隧道设备创建 netifd 接口，以便防火墙区域引用该接口。"
+
+msgid "Current Tailscale core"
+msgstr "当前 Tailscale 核心"
+
+msgid "Daemon socket path"
+msgstr "守护进程 socket 路径"
+
+msgid "Dark"
+msgstr "深色"
+
+msgid "days"
+msgstr "天"
+
+msgid "DERP latency"
+msgstr "DERP 延迟"
+
+msgid "DERP region list unavailable. Auto can still be selected."
+msgstr "当前无法读取 DERP 地区列表，仍可选择自动模式。"
+
+msgid "DERP relay"
+msgstr "DERP 中继"
+
+msgid "DERP selection could not be applied; reverted to Auto."
+msgstr "DERP 地区偏好无法应用，已恢复为自动模式。"
+
+msgid "Device"
+msgstr "设备"
+
+msgid "Diag exported"
+msgstr "诊断包已导出"
+
+msgid "Directory for temporary files and logs; it must be writable and have enough free space."
+msgstr "存放临时文件和日志的目录；必须可写并有足够空间。"
+
+msgid "Do not use"
+msgstr "不使用"
+
+msgid "Down"
+msgstr "下行"
+
+msgid "Download"
+msgstr "下载"
+
+msgid "Download and install"
+msgstr "下载并安装"
+
+msgid "Download failed"
+msgstr "下载失败"
+
+msgid "Download URL not found"
+msgstr "未找到下载地址"
+
+msgid "Downloading"
+msgstr "下载中"
+
+msgid "e.g. 192.168.1.0/24"
+msgstr "例如 192.168.1.0/24"
+
+msgid "Empty diag"
+msgstr "诊断内容为空"
+
+msgid "Enable daemon and Tailscale command logs"
+msgstr "启用守护进程和 Tailscale 命令日志"
+
+msgid "Enable network interface"
+msgstr "启用网络接口"
+
+msgid "Enable or disable Tailscale"
+msgstr "启用或停用 Tailscale"
+
+msgid "Enable scheduled update"
+msgstr "启用定时更新"
+
+msgid "Every X days"
+msgstr "每 X 天"
+
+msgid "Exists"
+msgstr "已存在"
+
+msgid "Export diag"
+msgstr "一键诊断导出"
+
+msgid "Export failed"
+msgstr "导出失败"
+
+msgid "Extracting"
+msgstr "解压中"
+
+msgid "Extraction failed"
+msgstr "解压失败"
+
+msgid "Failed"
+msgstr "失败："
+
+msgid "Failed to apply"
+msgstr "应用失败"
+
+msgid "Failed to get login URL"
+msgstr "获取登录链接失败"
+
+msgid "Failed to get status"
+msgstr "获取状态失败"
+
+msgid "Failed to load sources"
+msgstr "加载下载源失败"
+
+msgid "Failed to restart Tailscale service"
+msgstr "重启 Tailscale 服务失败"
+
+msgid "Failed to save"
+msgstr "保存失败"
+
+msgid "Failed to save AuthKey"
+msgstr "保存 AuthKey 失败"
+
+msgid "Failed to start task"
+msgstr "启动任务失败"
+
+msgid "File"
+msgstr "文件"
+
+msgid "File list"
+msgstr "文件列表"
+
+msgid "Filter forwarded traffic using connection state tracking."
+msgstr "根据连接状态跟踪过滤转发流量。"
+
+msgid "Firewall"
+msgstr "防火墙"
+
+msgid "Firewall forwarding"
+msgstr "防火墙放行"
+
+msgid "Firewall zone"
+msgstr "防火墙 Zone"
+
+msgid "Firewall zone associated with the Tailscale interface and its input, output, and forwarding policies."
+msgstr "与 Tailscale 接口关联的防火墙区域及其入站、出站和转发策略。"
+
+msgid "Getting login URL"
+msgstr "正在获取登录链接…"
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "GitLab"
+msgstr "GitLab"
+
+msgid "Guard and advanced"
+msgstr "守护与高级"
+
+msgid "Hostname"
+msgstr "设备名"
+
+msgid "Install dir"
+msgstr "存放目录"
+
+msgid "Install failed"
+msgstr "安装失败"
+
+msgid "Installed version"
+msgstr "已安装版本"
+
+msgid "Installing"
+msgstr "安装中"
+
+msgid "Interface"
+msgstr "接口"
+
+msgid "Interface name"
+msgstr "接口名"
+
+msgid "just now"
+msgstr "刚刚"
+
+msgid "Keep only warnings and errors in the command log."
+msgstr "命令日志中仅保留警告和错误信息。"
+
+msgid "Keep warnings and errors only"
+msgstr "仅保留警告和错误"
+
+msgid "Tailscale core update"
+msgstr "Tailscale 核心更新"
+
+msgid "Key expiry"
+msgstr "密钥过期"
+
+msgid "LAN to Tailscale"
+msgstr "LAN 到 Tailscale"
+
+msgid "Last seen"
+msgstr "最后在线"
+
+msgid "Latency"
+msgstr "延迟"
+
+msgid "Latest"
+msgstr "最新"
+
+msgid "Latest already"
+msgstr "已是最新"
+
+msgid "Latest version"
+msgstr "最新版本"
+
+msgid "Light"
+msgstr "浅色"
+
+
+
+msgid "Live traffic"
+msgstr "实时流量"
+
+msgid "Total traffic"
+msgstr "总流量"
+
+msgid "Current rates"
+msgstr "当前速率"
+
+msgid "Loading files"
+msgstr "正在加载文件列表…"
+
+msgid "Loading logs"
+msgstr "正在加载日志…"
+
+msgid "Loading nodes"
+msgstr "正在加载节点…"
+
+msgid "Loading versions"
+msgstr "正在加载版本…"
+
+msgid "Local API socket used by the CLI and LuCI backend; change only if the daemon uses the same path."
+msgstr "CLI 和 LuCI 后端使用的本地 API 套接字；仅当守护进程也使用相同路径时才修改。"
+
+msgid "Local environment"
+msgstr "本机环境"
+
+msgid "Log center"
+msgstr "日志中心"
+
+msgid "Log out"
+msgstr "注销"
+
+msgid "Log settings"
+msgstr "日志设置"
+
+msgid "Log size limit"
+msgstr "日志大小上限"
+
+msgid "Logged in"
+msgstr "已登录"
+
+msgid "Logged out"
+msgstr "已注销"
+
+msgid "Logging in, please wait"
+msgstr "登录中，请稍候"
+
+msgid "Login"
+msgstr "登录"
+
+msgid "Login server"
+msgstr "登录服务器"
+
+msgid "Login status"
+msgstr "登录状态"
+
+msgid "Login successful"
+msgstr "登录成功"
+
+msgid "Login timed out, please check the status"
+msgstr "登录超时，请检查状态"
+
+msgid "Login to Tailscale"
+msgstr "登录 Tailscale"
+
+msgid "Login URL"
+msgstr "登录链接"
+
+msgid "Logout failed"
+msgstr "注销失败"
+
+msgid "Logs"
+msgstr "日志"
+
+msgid "Logs cleared"
+msgstr "日志已清空"
+
+msgid "LuCI update"
+msgstr "LuCI 更新"
+
+msgid "LuCI updated"
+msgstr "LuCI 已更新"
+
+msgid "Manage my routes"
+msgstr "管理本机宣告"
+
+msgid "Masquerade"
+msgstr "地址伪装"
+
+msgid "Maximum number of automatic restarts; 0 means unlimited."
+msgstr "自动重启的最大次数；0 不限制次数。"
+
+msgid "Maximum retained log size in kilobytes; older output is truncated."
+msgstr "命令日志保留的最大大小，单位为 KB；超出部分会截断较早的日志。"
+
+msgid "Missing"
+msgstr "不存在"
+
+msgid "MSS clamping"
+msgstr "MSS 钳制"
+
+msgid "N days ago"
+msgstr "N 天前"
+
+msgid "N hours ago"
+msgstr "N 小时前"
+
+msgid "N minutes ago"
+msgstr "N 分钟前"
+
+msgid "Name of the tunnel device created by tailscaled; the OpenWrt network device follows this name automatically."
+msgstr "tailscaled 创建的 TUN 设备名称；OpenWrt 网络设备名会自动跟随此名称。"
+
+msgid "Netfilter mode"
+msgstr "netfilter 模式"
+
+msgid "Network"
+msgstr "网络"
+
+msgid "Network interface"
+msgstr "网络接口"
+
+msgid "Network mode"
+msgstr "运行模式"
+
+msgid "Never expires"
+msgstr "永不过期"
+
+msgid "No divert"
+msgstr "不接管流量"
+
+msgid "No files available"
+msgstr "无可用文件"
+
+msgid "No matching files"
+msgstr "未找到匹配文件"
+
+msgid "No matching nodes"
+msgstr "没有匹配的节点"
+
+msgid "No sources available"
+msgstr "无可用下载源"
+
+msgid "No versions available"
+msgstr "无可用版本"
+
+msgid "Node list"
+msgstr "节点列表"
+
+msgid "Nodes"
+msgstr "节点"
+
+msgid "None"
+msgstr "无"
+
+msgid "not in the current DERP map"
+msgstr "不在当前 DERP 地图中"
+
+msgid "Not logged in"
+msgstr "未登录"
+
+msgid "Not measured"
+msgstr "尚未测量"
+
+msgid "Not running"
+msgstr "未运行"
+
+msgid "Off"
+msgstr "关闭"
+
+msgid "Offline"
+msgstr "离线"
+
+msgid "On"
+msgstr "开启"
+
+msgid "On conflict with existing Zone"
+msgstr "遇到已存在 Zone 时"
+
+msgid "On installs and activates Tailscale firewall rules; No divert installs them without activating them, so you must connect the rules manually; Off creates no Tailscale firewall rules. Use No divert or Off only if you manage firewall integration yourself."
+msgstr "开启会安装并启用 Tailscale 防火墙规则；不接管流量会安装规则但不启用，需自行接入这些规则；关闭不创建 Tailscale 防火墙规则。仅在自行管理防火墙集成时选择“不接管流量”或“关闭”。"
+
+msgid "Online"
+msgstr "在线"
+
+msgid "online units"
+msgstr "台在线"
+
+msgid "Delay in seconds; only applied when router uptime is under 120 seconds."
+msgstr "延迟时间单位为秒；仅在路由器启动时间不足 120 秒时生效。"
+
+msgid "Open"
+msgstr "打开"
+
+msgid "OpenWrt logical interface name used to reference the Tailscale link."
+msgstr "OpenWrt 中用于引用 Tailscale 链路的逻辑接口名称。"
+
+msgid "Operator user"
+msgstr "操作用户"
+
+msgid "Optional upstream SOCKS5 proxy used for Tailscale connections; leave empty to disable."
+msgstr "Tailscale 建立连接时使用的可选上游 SOCKS5 代理；留空禁用。"
+
+msgid "Or use AuthKey for one-click login"
+msgstr "或使用 AuthKey 一键登录"
+
+msgid "Outbound HTTP proxy"
+msgstr "出站 HTTP 代理"
+
+msgid "Overview"
+msgstr "概览"
+
+msgid "Overwrite"
+msgstr "覆盖"
+
+msgid "P2P direct"
+msgstr "P2P直连"
+
+msgid "Package installation failed"
+msgstr "软件包安装失败"
+
+msgid "Performance"
+msgstr "进程性能"
+
+msgid "Ping"
+msgstr "测速"
+
+msgid "Please enter an AuthKey"
+msgstr "请输入 AuthKey"
+
+msgid "Please install the core first"
+msgstr "请先安装内核"
+
+msgid "Preferred DERP region"
+msgstr "DERP 首选地区"
+
+msgid "Protocol"
+msgstr "协议"
+
+msgid "Re-auth failed"
+msgstr "重新认证失败"
+
+msgid "Re-auth sent, refreshing"
+msgstr "已发送重新认证，刷新中"
+
+msgid "Re-authenticate"
+msgstr "重新认证"
+
+msgid "Ready"
+msgstr "就绪"
+
+msgid "Reconnecting"
+msgstr "重新连接中"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Refresh failed"
+msgstr "刷新失败"
+
+msgid "Refresh latency"
+msgstr "刷新延迟"
+
+msgid "Refreshed"
+msgstr "已刷新"
+
+msgid "Region"
+msgstr "区域"
+
+msgid "Reject new incoming connections from other tailnet devices. This can also block access to services on this router."
+msgstr "拒绝来自其他 Tailnet 设备的新入站连接；这也可能阻止访问路由器上的服务。"
+
+msgid "Relay"
+msgstr "中继"
+
+msgid "Remove subnet"
+msgstr "删除网段"
+
+msgid "Request timed out"
+msgstr "请求超时"
+
+msgid "Resolving"
+msgstr "正在解析"
+
+msgid "Respawn retry"
+msgstr "重启次数限制"
+
+msgid "Respawn threshold"
+msgstr "重启故障统计阈值"
+
+msgid "Respawn timeout"
+msgstr "重启等待时间"
+
+msgid "Restart Tailscale service"
+msgstr "重启 Tailscale 服务"
+
+msgid "Restart warning"
+msgstr "重启警告"
+
+msgid "Restarting"
+msgstr "重启中"
+
+msgid "Restarting Tailscale service"
+msgstr "正在重启 Tailscale 服务…"
+
+msgid "Result code"
+msgstr "返回码"
+
+msgid "Route this device's internet-bound traffic through the selected peer."
+msgstr "将本设备发往互联网的流量通过所选节点转发。"
+
+msgid "Route this device's internet-bound traffic through the selected peer; this does not control which subnet routes it accepts."
+msgstr "将本设备的互联网流量经所选节点转发；此项不控制本设备是否接收子网路由。"
+
+msgid "Routes"
+msgstr "路由"
+
+msgid "Run state"
+msgstr "运行状态"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Running but not logged in, click to login"
+msgstr "服务运行中但未登录，点击登录"
+
+msgid "Runtime and tailnet status"
+msgstr "运行与 Tailnet 状态"
+
+msgid "Runtime log"
+msgstr "运行日志"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Saved"
+msgstr "已保存"
+
+msgid "Saved as Auto; it will apply when Tailscale starts."
+msgstr "已保存为自动模式，将在 Tailscale 启动后生效。"
+
+msgid "Saved; will apply when Tailscale starts"
+msgstr "已保存，将在 Tailscale 启动后应用。"
+
+msgid "Scan to login"
+msgstr "扫码登录"
+
+msgid "Scan, jump, or AuthKey"
+msgstr "扫码 / 跳转 / AuthKey 三选一"
+
+msgid "Scheduled saved"
+msgstr "定时任务已保存"
+
+msgid "Scheduled update"
+msgstr "定时更新"
+
+msgid "Search name, IP, OS"
+msgstr "搜索设备名 / IP / 系统…"
+
+msgid "Service is stopped, please start it first"
+msgstr "服务已停止，请先启动"
+
+msgid "Service state timed out"
+msgstr "等待服务状态超时"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "Shields up"
+msgstr "屏蔽入站连接"
+
+msgid "Showing 8 of N nodes, see Nodes page"
+msgstr "仅显示 8 台，共 N 台，详见「节点」页"
+
+msgid "Skip"
+msgstr "跳过"
+
+msgid "SOCKS5"
+msgstr "SOCKS5"
+
+msgid "Source"
+msgstr "源"
+
+msgid "Starting"
+msgstr "启动中"
+
+msgid "Starting service"
+msgstr "正在启动服务…"
+
+msgid "State collect"
+msgstr "状态采集"
+
+msgid "State directory"
+msgstr "状态目录"
+
+msgid "Stateful filtering"
+msgstr "有状态过滤"
+
+msgid "Status"
+msgstr "状态"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Stopping service"
+msgstr "正在停止服务…"
+
+msgid "Stores this node's identity and keys. Keep it persistent across reboots to avoid logging in again."
+msgstr "保存本节点的身份和密钥。应在重启后保留该目录，以免需要重新登录。"
+
+msgid "Subnet approved"
+msgstr "子网·已批准"
+
+msgid "Subnet pending"
+msgstr "子网·待审批"
+
+msgid "Subnet route SNAT"
+msgstr "子网路由 SNAT"
+
+msgid "Subnet routes"
+msgstr "子网路由"
+
+msgid "Subnet routes need approval in the admin console"
+msgstr "子网路由需在控制台批准后生效"
+
+msgid "Tail IP"
+msgstr "本机 Tail IP"
+
+msgid "Tail IPs"
+msgstr "Tail IP"
+
+msgid "Tailnet"
+msgstr "尾网"
+
+msgid "Tailnet status"
+msgstr "Tailnet 状态"
+
+msgid "Tailscale CPU"
+msgstr "Tailscale CPU"
+
+msgid "Tailscale memory"
+msgstr "Tailscale 内存"
+
+msgid "%d cores"
+msgstr "%d 核"
+
+msgid "Tailscale network"
+msgstr "Tailscale 网络"
+
+msgid "Tailscale service action failed"
+msgstr "Tailscale 服务操作失败"
+
+msgid "Tailscale SSH"
+msgstr "Tailscale SSH"
+
+msgid "Tailscale to LAN"
+msgstr "Tailscale 到 LAN"
+
+msgid "Tailscale to WAN"
+msgstr "Tailscale 到 WAN"
+
+msgid "Task log"
+msgstr "任务日志"
+
+msgid "Temp dir"
+msgstr "临时目录"
+
+msgid "Testing binary"
+msgstr "正在检查二进制"
+
+msgid "The name shown to other tailnet devices and MagicDNS; it does not change the router's system hostname."
+msgstr "此名称会显示在其他 Tailnet 设备和 MagicDNS 中，不会更改路由器的系统主机名。"
+
+msgid "This host"
+msgstr "本机"
+
+msgid "This host will leave the tailnet and need a new login."
+msgstr "登出后本机断开 Tailnet，需重新扫码登录。"
+
+msgid "Time window in seconds in which repeated daemon exits are counted as crashes."
+msgstr "统计守护进程反复退出是否属于崩溃的时间窗口，单位为秒。"
+
+msgid "Topology"
+msgstr "网络拓扑"
+
+msgid "Translate source addresses on forwarded traffic so return packets can get back through this router when the destination network has no route to the tailnet."
+msgstr "对转发流量执行源地址转换；当目标网络没有返回 Tailnet 的路由时，可让回程流量经本路由器返回。"
+
+msgid "Troubleshooting kit"
+msgstr "排障工具"
+
+msgid "TUN"
+msgstr "TUN"
+
+msgid "TUN creates a kernel network device for normal routing; Userspace uses a userspace network stack and does not create that device."
+msgstr "TUN 模式会创建内核网络设备以供常规路由使用；用户态模式使用用户态网络栈，不会创建该设备。"
+
+msgid "TUN interface name"
+msgstr "TUN 接口名"
+
+msgid "UDP port"
+msgstr "UDP 端口"
+
+msgid "UDP port used by tailscaled. Set to 0 to choose a port automatically."
+msgstr "tailscaled 监听的 UDP 端口；设为 0 时自动选择端口。"
+
+msgid "Unknown error"
+msgstr "未知错误"
+
+msgid "Unmanaged"
+msgstr "未托管"
+
+msgid "Up"
+msgstr "上行"
+
+msgid "Upload"
+msgstr "上传"
+
+msgid "Update available"
+msgstr "有更新"
+
+msgid "Uptime"
+msgstr "已运行"
+
+msgid "Use DNS settings supplied by the tailnet. This is separate from accepting subnet routes."
+msgstr "使用 Tailnet 下发的 DNS 设置；此选项与接收子网路由相互独立。"
+
+msgid "Use exit node"
+msgstr "使用出口节点"
+
+msgid "Userspace"
+msgstr "用户态"
+
+msgid "Verifying"
+msgstr "校验中"
+
+msgid "Version"
+msgstr "版本"
+
+msgid "View full status"
+msgstr "查看完整状态"
+
+msgid "Wait time in seconds before restarting the daemon after it exits."
+msgstr "守护进程退出后等待重启的时间，单位为秒。"
+
+msgid "Waiting for Tailscale to reconnect"
+msgstr "正在等待 Tailscale 重新连接"
+
+msgid "WAN to Tailscale"
+msgstr "WAN 到 Tailscale"
+
+msgid "When this device uses an exit node, allow it to access its local LAN directly."
+msgstr "本设备使用出口节点时，仍允许直接访问本地 LAN。"
+
+msgid "Write daemon and Tailscale command output to the local log."
+msgstr "将守护进程和 Tailscale 命令输出写入本地日志。"
+
+msgid "Zone name"
+msgstr "Zone 名称"
+
+msgid "Binary layout will switch to the selected channel"
+msgstr "二进制布局将切换为所选渠道"
+
+msgid "Channel switch failed"
+msgstr "更新渠道切换失败"
+
+msgid "Current binary footprint"
+msgstr "当前二进制文件占用"
+
+msgid "Download archive"
+msgstr "下载压缩包"
+
+msgid "Free space in download cache"
+msgstr "下载缓存目录可用空间"
+
+msgid "Free space in install filesystem"
+msgstr "安装目录所在文件系统可用空间"
+
+msgid "Free space in temporary filesystem"
+msgstr "临时目录所在文件系统可用空间"
+
+msgid "Installed version is newer than selected channel; automatic downgrade was refused"
+msgstr "当前已安装版本高于所选渠道版本，已拒绝自动降级"
+
+msgid "Mirror source"
+msgstr "镜像源"
+
+msgid "Official architecture"
+msgstr "官方包架构"
+
+msgid "Official channel only supports the latest stable version"
+msgstr "官方渠道仅支持最新稳定版"
+
+msgid "Official static Linux update"
+msgstr "官方 Linux 静态包更新"
+
+msgid "Official Tailscale"
+msgstr "Tailscale 官方版"
+
+msgid "Official update failed"
+msgstr "官方更新失败"
+
+msgid "Tailscale CLI is missing"
+msgstr "Tailscale 命令行程序缺失"
+
+msgid "Unavailable"
+msgstr "不可用"
+
+msgid "Update channel"
+msgstr "更新渠道"
+
+msgid "GitHub build"
+msgstr "GitHub 编译"
+
+msgid "Choose local subnet"
+msgstr "选择本地子网"
+
+msgid "Choose exit node"
+msgstr "选择出口节点"
+
+msgid "Could not back up binaries"
+msgstr "无法备份现有二进制文件"
+
+msgid "Update failed; previous state restored"
+msgstr "更新失败，已恢复到先前状态"
+
+msgid "Update failed and rollback failed; backup files were kept"
+msgstr "更新失败且自动回滚失败，备份文件已保留"
+
+msgid "Project repository"
+msgstr "项目地址"
+
+msgid "Automatic backup and rollback when space permits"
+msgstr "空间允许时自动备份并在失败时回滚"
+
+msgid "Health check (s)"
+msgstr "健康检查（秒）"
+
+msgid "If Tailscale was running before the update, wait up to %s seconds for it to restart; if it has not started by then, automatically restore the backup."
+msgstr "更新时 Tailscale 已启动，最多等待 %s 秒；若 Tailscale 仍未启动，则自动恢复备份。"
+
+msgid "Automatic backup and rollback are disabled."
+msgstr "已关闭自动备份和失败回滚。"
+
+msgid "Scheduled updates check available space when each update runs."
+msgstr "每次执行定时更新时检查可用空间。"
+
+msgid "Update failed; no rollback backup was available"
+msgstr "更新失败，没有可用备份，无法自动回滚。"
+
+msgid "Installed binaries did not pass the version check"
+msgstr "安装后的二进制版本检查未通过"
+
+msgid "Updated without a rollback backup"
+msgstr "更新完成，但没有可用回滚备份"
+
+msgid "Available space is checked when the update starts."
+msgstr "更新开始时检查可用空间。"
+
+msgid "Space is checked dynamically from the package, installed binaries, and available backup locations when the update runs."
+msgstr "更新时根据实际安装包、已安装二进制文件和可用备份位置动态检查空间。"
+
+msgid "Required space is checked dynamically using the actual download and binary sizes."
+msgstr "更新时按实际下载文件和二进制大小动态检查所需空间。"
+
+msgid "Waiting for the Tailscale service"
+msgstr "等待 Tailscale 服务就绪"
+
+msgid "Insufficient free space for this update"
+msgstr "可用空间不足，无法更新"
+
+msgid "Install filesystem"
+msgstr "安装文件系统"
+
+msgid "Temporary filesystem"
+msgstr "临时文件系统"
+
+msgid "Total downloaded"
+msgstr "总下载量"
+
+msgid "Total uploaded"
+msgstr "总上传量"
+
+msgid "Online download"
+msgstr "在线下载"
+
+msgid "Manual upload"
+msgstr "手动上传"
+
+msgid "GitHub artifacts"
+msgstr "GitHub 产物页"
+
+msgid "GitLab artifacts"
+msgstr "GitLab 产物页"
+
+msgid "Matching device download link is being resolved"
+msgstr "正在解析适配当前设备的下载链接"
+
+msgid "A direct archive link is not available for the official channel"
+msgstr "官方渠道不提供直接归档下载链接"
+
+msgid "No matching cached download is available"
+msgstr "缓存中没有匹配此设备的下载文件"
+
+msgid "Download matching device"
+msgstr "下载当前设备对应的文件"
+
+msgid "Choose the extracted tailscaled binary to upload."
+msgstr "选择解压后的 tailscaled 上传。"
+
+msgid "Tailscale daemon binary"
+msgstr "tailscaled 守护进程"
+
+msgid "The file is staged in RAM, checked, then written over the installed binary before the service restarts."
+msgstr "文件先暂存于 RAM 并完成校验，再直接覆盖当前二进制并重启服务。"
+
+msgid "Keep a LAN session open during restart; a Tailscale-only session will disconnect."
+msgstr "重启期间请通过 LAN 访问；仅使用 Tailscale 连接会中断。"
+
+msgid "Upload and install"
+msgstr "上传并安装"
+
+msgid "Tailscale core uploaded"
+msgstr "Tailscale 核心已手动安装"
+
+msgid "Uploading"
+msgstr "正在上传"
+
+msgid "Stopping"
+msgstr "正在停止"
+
+msgid "Choose the extracted tailscaled binary"
+msgstr "请选择解压后的 tailscaled 文件"
+
+msgid "RAM temporary storage is unavailable"
+msgstr "无法使用 RAM 临时存储"
+
+msgid "Not enough RAM space for this upload"
+msgstr "RAM 空间不足，无法暂存此文件"
+
+msgid "File exceeds the 32 MiB upload limit"
+msgstr "文件超过 32 MiB 上传限制"
+
+msgid "Upload chunk failed"
+msgstr "上传数据块失败"
+
+msgid "Upload is incomplete"
+msgstr "上传尚未完成"
+
+msgid "Could not stop Tailscale before replacing the binary"
+msgstr "覆盖二进制前无法停止 Tailscale"
+
+msgid "Tailscale failed to restart"
+msgstr "Tailscale 重启失败"
+
+msgid "Manual upload does not change the online update channel."
+msgstr "手动上传不会更改当前在线更新渠道。"
+
+msgid "e.g. router-01"
+msgstr "例如 router-01"
+
+msgid "0 for automatic selection"
+msgstr "设为 0 时自动选择"
+
+msgid "e.g. 127.0.0.1:1080"
+msgstr "例如 127.0.0.1:1080"
+
+msgid "e.g. 127.0.0.1:8080"
+msgstr "例如 127.0.0.1:8080"
+
+msgid "e.g. root"
+msgstr "例如 root"
+
+msgid "e.g. https://headscale.example.com"
+msgstr "例如 https://headscale.example.com"
+
+msgid "Reload network configuration on stop"
+msgstr "停止时重载网络配置"
+
+msgid "Disable this if the WAN port flickers when stopping Tailscale."
+msgstr "停止Tailscale出现wan口网络抖动关闭此项"
+
+msgid "Delete Tailscale core binaries"
+msgstr "删除 Tailscale 核心二进制文件"
+
+msgid "Delete Tailscale core binaries?"
+msgstr "确认删除 Tailscale 核心二进制文件？"
+
+msgid "This will stop Tailscale and remove tailscaled and tailscale from the configured install directory. Existing configuration is kept. Since the service remains enabled, it may reinstall the core automatically the next time the router starts."
+msgstr "此操作将停止 Tailscale，并从配置的安装目录中删除 tailscaled 和 tailscale。现有配置会保留。由于服务仍处于启用状态，路由器下次启动时可能会自动重新安装核心。"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Tailscale binaries deleted."
+msgstr "Tailscale 二进制文件已删除。"
+
+msgid "Another operation is in progress."
+msgstr "另一个操作正在进行中。"
+
+msgid "Could not stop Tailscale before deleting binaries."
+msgstr "删除二进制文件前无法停止 Tailscale。"
+
+msgid "Failed to delete Tailscale binaries."
+msgstr "删除 Tailscale 二进制文件失败。"

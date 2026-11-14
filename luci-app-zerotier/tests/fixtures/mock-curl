@@ -1,0 +1,93 @@
+#!/bin/sh
+method=GET
+body_file=''
+data=''
+url=''
+http_status=200
+
+while [ "$#" -gt 0 ]; do
+	case "$1" in
+		-o) body_file="$2"; shift 2 ;;
+		-w|-H) shift 2 ;;
+		-X) method="$2"; shift 2 ;;
+		-d|--data-binary) data="$2"; shift 2 ;;
+		http://*) url="$1"; shift ;;
+		*) shift ;;
+	esac
+done
+
+case "$data" in
+	@*) data="$(cat "${data#@}")" ;;
+esac
+
+[ -n "${ZT_TEST_REQUEST_LOG:-}" ] && printf '%s %s\n' "$method" "$url" >> "$ZT_TEST_REQUEST_LOG"
+
+case "$method $url" in
+	"GET http://127.0.0.1:9993/status")
+		body='{"address":"8056c2e21c","version":"1.10.6","online":true}'
+		;;
+	"GET http://127.0.0.1:9993/controller")
+		body='{"controller":true,"databaseReady":true,"apiVersion":1}'
+		;;
+	"GET http://127.0.0.1:9993/controller/network")
+		body='["8056c2e21c000001"]'
+		;;
+	"GET http://127.0.0.1:9993/controller/network/8056c2e21c000001")
+		body='{"id":"8056c2e21c000001","name":"home_zj","v4AssignMode":{"zt":false},"routes":[{"target":"10.10.10.0/24","via":null},{"target":"192.168.50.0/24","via":"10.10.10.1"},{"target":"10.200.0.0/16","via":null}]}'
+		;;
+	"GET http://127.0.0.1:9993/controller/network/8056c2e21c000001/member")
+		body='{"8056c2e21c":1720000000,"bab1e61f17":1720000000,"dead100000":1700000000}'
+		;;
+	"GET http://127.0.0.1:9993/controller/network/8056c2e21c000001/member/8056c2e21c")
+		body='{"id":"8056c2e21c","name":"controller_self","authorized":true}'
+		;;
+	"GET http://127.0.0.1:9993/controller/network/8056c2e21c000001/member/bab1e61f17")
+		body='{"id":"bab1e61f17","name":"online_node","authorized":true}'
+		;;
+	"GET http://127.0.0.1:9993/controller/network/8056c2e21c000001/member/dead100000")
+		if [ "${ZT_TEST_FAIL_MEMBER_GET:-}" = "dead100000" ]; then
+			body='{"error":"mock member read failed"}'
+			http_status=500
+		else
+			body='{"id":"dead100000","name":"offline_node","authorized":false}'
+		fi
+		;;
+	"GET http://127.0.0.1:9993/peer")
+		body='[{"address":"bab1e61f17","latency":20,"paths":[{"active":true}]}]'
+		;;
+	"POST http://127.0.0.1:9993/controller/network")
+		printf '%s' "$data" > "$ZT_TEST_PAYLOAD"
+		body='{"id":"8056c2e21c000002"}'
+		;;
+	"POST http://127.0.0.1:9993/controller/network/8056c2e21c000001")
+		printf '%s' "$data" > "$ZT_TEST_PAYLOAD"
+		if [ -n "${ZT_TEST_NETWORK_RESPONSE:-}" ]; then
+			body="$ZT_TEST_NETWORK_RESPONSE"
+		else
+			body="$data"
+		fi
+		;;
+	"POST http://127.0.0.1:9993/controller/network/8056c2e21c______")
+		printf '%s' "$data" > "$ZT_TEST_PAYLOAD"
+		body='{"id":"8056c2e21c000002"}'
+		;;
+	"POST http://127.0.0.1:9993/controller/network/"*"/member/"*)
+		member_id="${url##*/}"
+		if [ "${ZT_TEST_FAIL_MEMBER:-}" = "$member_id" ]; then
+			body='{"error":"mock member restore failed"}'
+			http_status=500
+		else
+			body="$data"
+		fi
+		;;
+	*)
+		body='{"error":"unexpected mock request"}'
+		;;
+esac
+
+if [ -n "$body_file" ]; then
+	printf '%s' "$body" > "$body_file"
+	printf '%s' "$http_status"
+else
+	printf '%s\n%s' "$body" "$http_status"
+fi

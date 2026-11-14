@@ -1,0 +1,37 @@
+{
+	"luci-app-zerotier": {
+		"description": "Grant access to ZeroTier configuration and embedded Controller",
+		"read": {
+			"file": {
+				"/sbin/ifconfig": [ "exec" ]
+			},
+			"ubus": {
+				"service": [ "list" ],
+				"zerotier-controller": [
+					"status",
+					"list_networks",
+					"get_network_info",
+					"list_members",
+					"export_backup"
+				]
+			},
+			"uci": [ "zerotier" ]
+		},
+		"write": {
+			"ubus": {
+				"zerotier-controller": [
+					"create_network",
+					"update_ip_pool",
+					"authorize_member",
+					"change_member_ip",
+					"rename_member",
+					"add_route",
+					"del_route",
+					"delete_member",
+					"import_backup"
+				]
+			},
+			"uci": [ "zerotier" ]
+		}
+	}
+}

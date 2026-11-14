@@ -1,0 +1,4 @@
+#!/bin/sh
+
+[ -n "${ZT_TEST_UCODE_LOG:-}" ] && printf '%s\n' "$*" >> "$ZT_TEST_UCODE_LOG"
+exit 1

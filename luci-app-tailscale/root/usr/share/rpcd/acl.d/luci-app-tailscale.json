@@ -1,0 +1,53 @@
+{
+	"luci-app-tailscale": {
+		"description": "Grant access to the Tailscale modern console",
+		"read": {
+			"ubus": {
+				"tailscale": [
+					"getStatus",
+					"getConfig",
+					"getSources",
+					"getVersionFiles",
+					"resolveFile",
+					"getFileSize",
+					"progress",
+					"getLogs",
+					"diag"
+				]
+			}
+		},
+		"write": {
+			"uci": [
+				"tailscale"
+			],
+			"cgi-io": [
+				"upload"
+			],
+			"file": {
+				"/tmp/tailscale/manual/*": [
+					"write"
+				]
+			},
+			"ubus": {
+				"tailscale": [
+					"setConfig",
+					"refreshSources",
+					"download",
+					"cancelTask",
+					"beginManualUpload",
+					"finishManualUpload",
+					"applyNetwork",
+					"applyCron",
+					"getLogin",
+					"logout",
+					"reauth",
+					"applyUp",
+					"pingPeers",
+					"serviceAction",
+					"clearLogs",
+					"removeCore"
+				]
+			}
+		}
+	}
+}
