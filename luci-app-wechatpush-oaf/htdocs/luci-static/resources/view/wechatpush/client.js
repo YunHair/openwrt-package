@@ -107,7 +107,6 @@ return view.extend({
 				return { devices: [] };
 			}
 		});
-	}
 	},
 
 	render: function (data) {
