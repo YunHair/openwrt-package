@@ -5,6 +5,45 @@
 'require poll';
 'require uci';
 
+// 解析 /tmp/wechatpush/usage.db（CSV 表头: no,ip,mac,in,out,total,used）
+// in = 今日下载，out = 今日上传，total = 今日总计。文件不存在或为空时返回空映射。
+function parseUsageDb(raw) {
+	var map = {};
+	if (!raw) return map;
+	var lines = raw.split('\n');
+	if (lines.length < 2) return map;
+	var header = lines[0].split(',');
+	var macIdx = header.indexOf('mac');
+	var inIdx = header.indexOf('in');
+	var outIdx = header.indexOf('out');
+	var totalIdx = header.indexOf('total');
+	if (macIdx < 0) return map;
+	for (var i = 1; i < lines.length; i++) {
+		var cols = lines[i].split(',');
+		if (cols.length <= macIdx) continue;
+		var mac = (cols[macIdx] || '').trim().toLowerCase();
+		if (!mac || mac === 'mac') continue;
+		var vin = inIdx >= 0 ? (parseInt(cols[inIdx], 10) || 0) : 0;
+		var vout = outIdx >= 0 ? (parseInt(cols[outIdx], 10) || 0) : 0;
+		var vtotal = totalIdx >= 0 ? (parseInt(cols[totalIdx], 10) || 0) : (vin + vout);
+		map[mac] = { in: vin, out: vout, total: vtotal };
+	}
+	return map;
+}
+
+function formatTraffic(bytes) {
+	var value = parseInt(bytes, 10);
+	if (!value || value <= 0) return '0';
+	var units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+	var i = 0;
+	while (value >= 1024 && i < units.length - 1) {
+		value = value / 1024;
+		i++;
+	}
+	var digits = i === 0 ? 0 : (value >= 100 ? 0 : (value >= 10 ? 1 : 2));
+	return value.toFixed(digits) + ' ' + units[i];
+}
+
 return view.extend({
 	load: function () {
 		var self = this;
@@ -29,10 +68,15 @@ return view.extend({
 
 	fetchDevices: function () {
 		var devices_path = '/tmp/wechatpush/devices.json';
-		return fs.read(devices_path).then(function (content) {
+		var usage_path = '/tmp/wechatpush/usage.db';
+		return Promise.all([
+			fs.read(devices_path),
+			fs.read(usage_path).catch(function () { return ''; })
+		]).then(function (res) {
 			try {
-				var data = JSON.parse(content);
+				var data = JSON.parse(res[0]);
 				var wlanMap = {};
+				var usageMap = parseUsageDb(res[1] || '');
 
 				// 如果存在无线接口信息，解析为频段
 				if (data.wlan && Array.isArray(data.wlan)) {
@@ -40,8 +84,8 @@ return view.extend({
 						wlanMap[wlan.interface] = wlan.band;
 					});
 				}
-				
-				// 解析设备的接口信息
+
+				// 解析设备的接口信息，并附加今日流量
 				data.devices.forEach(function (device) {
 					if (device.type) {
 						device.interface = device.type;
@@ -50,6 +94,12 @@ return view.extend({
 					} else {
 						device.interface = "LAN";
 					}
+					var traffic = usageMap[(device.mac || '').toLowerCase()];
+					if (traffic) {
+						device.traffic_in = traffic.in;
+						device.traffic_out = traffic.out;
+						device.traffic_total = traffic.total;
+					}
 				});
 				return { devices: data.devices };
 			} catch (e) {
@@ -57,6 +107,7 @@ return view.extend({
 				return { devices: [] };
 			}
 		});
+	}
 	},
 
 	render: function (data) {
@@ -65,8 +116,8 @@ return view.extend({
 		}
 		var devices = data.devices.filter(device => device.status === 'online' || device.status === 'unknown');
 		var totalDevices = devices.length;
-		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Interfaces'), _('Connection Point'), _('Online time'), _('Details')];
-		var columns = ['name', 'ip', 'mac', 'interface', 'parent', 'uptime', 'usage'];
+		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Interfaces'), _('Connection Point'), _('Online time'), _('Download'), _('Upload'), _('Details')];
+		var columns = ['name', 'ip', 'mac', 'interface', 'parent', 'uptime', 'traffic_in', 'traffic_out', 'usage'];
 		var visibleColumns = [];
 		var hasData = false;
 
@@ -219,7 +270,9 @@ return view.extend({
 				}
 				/* 隐藏特定列 */
 				.device-table th[data-column="parent"],
-				.device-table td[data-column="parent"] {
+				.device-table td[data-column="parent"],
+				.device-table th[data-column="traffic_out"],
+				.device-table td[data-column="traffic_out"] {
 					display: none;
 				}
 				/* 隐藏接口列的文本部分 */
@@ -291,6 +344,11 @@ return view.extend({
 
 							cell.appendChild(icon);
 							cell.appendChild(text);
+						} else if (columns[i] === 'traffic_in' || columns[i] === 'traffic_out') {
+							var trafficBytes = parseInt(device[columns[i]], 10) || 0;
+							cell.textContent = formatTraffic(trafficBytes);
+							if (trafficBytes > 0)
+								cell.title = trafficBytes + ' B';
 						} else if (columns[i] === 'parent') {
 							if (device['parent']) {
 								var parentDevice = devices.find(d => {
@@ -408,6 +466,8 @@ return view.extend({
 				return ipToNumber(device['ip']);
 			} else if (column === 'interface') {
 				return interfaceDisplayMap[device['interface']] || 'LAN';
+			} else if (column === 'traffic_in' || column === 'traffic_out') {
+				return parseInt(device[column], 10) || 0;
 			} else if (column === 'parent') {
 				// 使用 parent 列的实际显示值进行排序
 				if (device['parent']) {
