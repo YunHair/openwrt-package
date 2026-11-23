@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  PACKAGE_NAME: luci-app-wechatpush
+  PACKAGE_NAME: luci-app-wechatpush-oaf
   SDK_DIR: /home/runner/work/openwrt-sdk
 
 permissions:
