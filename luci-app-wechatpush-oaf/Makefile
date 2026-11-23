@@ -1,10 +1,10 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=luci-app-wechatpush
-# apk (OpenWrt 25.12+) 的版本号只接受 数字[.数字]*[-r数字]，
-# 因此 fork 标识放在 tag 与 release notes 里，包版本用 3.6.13-r2。
-PKG_VERSION:=3.6.13
-PKG_RELEASE:=2
+PKG_NAME:=luci-app-wechatpush-oaf
+# OAF 定制分支，包名与 LuCI 应用名统一为 luci-app-wechatpush-oaf。
+# apk (OpenWrt 25.12+) 的版本号只接受 数字[.数字]*[-r数字]，故实际包版本为 1.0-r1。
+PKG_VERSION:=1.0
+PKG_RELEASE:=1
 
 PKG_MAINTAINER:=tty228 <tty228@yeah.net>
 PKG_CONFIG_DEPENDS:= \
@@ -13,7 +13,7 @@ PKG_CONFIG_DEPENDS:= \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Local_Disk_Information_Detection \
         CONFIG_PACKAGE_$(PKG_NAME)_Enable_Host_Information_Detection
 
-LUCI_TITLE:=LuCI support for wechatpush
+LUCI_TITLE:=LuCI support for WeChat push (OAF)
 LUCI_PKGARCH:=all
 LUCI_DEPENDS:=+iputils-arping +curl +jq +bash +luci-lua-runtime \
         +PACKAGE_$(PKG_NAME)_Enable_Traffic_Monitoring:wrtbwmon \
