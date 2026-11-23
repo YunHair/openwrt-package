@@ -1,0 +1,43 @@
+#!/bin/sh
+# ctstat 后端接口，供 LuCI 页面调用
+#   status  输出当前 JSON
+#   reset   清零累计
+#   info    诊断信息
+
+STATUS_JSON=/tmp/ctstat/usage.json
+
+case "$1" in
+status)
+	if [ -f "$STATUS_JSON" ]; then
+		cat "$STATUS_JSON"
+	else
+		echo '{"ts":0,"interval":0,"clients":[]}'
+	fi
+	;;
+reset)
+	# 交给采集器在下一轮开头处理，避免与 mv 竞态
+	mkdir -p /tmp/ctstat
+	: > /tmp/ctstat/.reset
+	echo '{"ok":1}'
+	;;
+info)
+	acct=$(cat /proc/sys/net/netfilter/nf_conntrack_acct 2>/dev/null)
+	[ -z "$acct" ] && acct="unavailable"
+	cnt=$(wc -l < /proc/net/nf_conntrack 2>/dev/null || echo 0)
+	delay=$(cat /sys/kernel/debug/ecm/ecm_classifier_default/accel_delay_pkts 2>/dev/null || echo "n/a")
+	ecmc=$(cat /sys/kernel/debug/ecm/ecm_db/connection_count 2>/dev/null || echo "n/a")
+	en=$(uci -q get ctstat.config.enabled)
+	iv=$(uci -q get ctstat.config.interval)
+	lf=$(uci -q get ctstat.config.lan_prefix)
+	run=$(pgrep -f "ctstat/collector.sh" 2>/dev/null | head -1)
+	[ -z "$run" ] && run=$(ps w 2>/dev/null | grep "[c]ollector.sh" | awk '{print $1; exit}')
+	run=$(echo "$run" | tr -d ' \n')
+
+	printf '{"enabled":"%s","interval":"%s","lan_prefix":"%s","conntrack_acct":"%s","conntrack_entries":"%s","ecm_accel_delay":"%s","ecm_connections":"%s","running":"%s"}\n' \
+		"${en:-?}" "${iv:-?}" "${lf:-auto}" "$acct" "$cnt" "$delay" "$ecmc" "${run:-no}"
+	;;
+*)
+	echo '{"error":"usage: ctstat-call status|reset|info"}'
+	exit 1
+	;;
+esac

@@ -1,0 +1,13 @@
+{
+	"admin/services/ctstat": {
+		"title": "流量统计",
+		"order": 60,
+		"action": {
+			"type": "view",
+			"path": "ctstat/overview"
+		},
+		"depends": {
+			"acl": [ "luci-app-ctstat" ]
+		}
+	}
+}
