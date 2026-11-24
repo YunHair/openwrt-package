@@ -1,0 +1,148 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# ctstat-migrate - run by the package postinst (can also be run by hand).
+#
+# Handles three renames:
+#   1. luci-app-traffic-chart -> luci-app-ctstat (package, module and UCI names)
+#   2. nss-rk.qos / nss-trafficchart.qos -> nss-ctstat.qos (SQM classifier)
+#   3. /etc/trafficchart-* -> /etc/ctstat-* (domain database and history)
+#
+# Nothing here touches a running SQM instance: restarting nssifb on a live
+# router can crash it, so the script only rewrites the configuration and asks
+# the user to restart SQM when convenient.
+
+log() {
+    logger -t ctstat "$1" 2>/dev/null
+    echo "ctstat: $1"
+}
+
+# --- 1. stop the previous service before its files are replaced -------------
+if [ -x /etc/init.d/trafficchart ]; then
+    /etc/init.d/trafficchart stop 2>/dev/null
+    /etc/init.d/trafficchart disable 2>/dev/null
+    log "stopped the previous trafficchart service"
+fi
+
+# --- 2. migrate the UCI configuration --------------------------------------
+# opkg unpacks the data archive (including this package's own /etc/config/ctstat)
+# before postinst runs, so the new file exists even on a fresh upgrade. Only keep
+# it when it differs from the shipped default, i.e. when a previous install of
+# this package already stored user settings in it.
+default_config=/usr/share/ctstat/ctstat.default
+if [ -f /etc/config/trafficchart ]; then
+    take_old=0
+    if [ ! -f /etc/config/ctstat ]; then
+        take_old=1
+    elif [ -f "$default_config" ] && cmp -s /etc/config/ctstat "$default_config"; then
+        take_old=1
+    fi
+    if [ "$take_old" = 1 ]; then
+        if mv -f /etc/config/trafficchart /etc/config/ctstat; then
+            # The section type is stored in the file, not derived from its name.
+            sed -i 's/^config trafficchart /config ctstat /' /etc/config/ctstat
+            log "settings migrated: /etc/config/trafficchart -> /etc/config/ctstat"
+        else
+            log "could not move /etc/config/trafficchart; the default settings are used"
+        fi
+    else
+        # Both files exist and the new one was edited by the user. Keep the live
+        # configuration and preserve the old one instead of merging blindly.
+        mv /etc/config/trafficchart /etc/config/trafficchart.migrated 2>/dev/null &&
+            log "existing /etc/config/ctstat kept; previous settings saved as /etc/config/trafficchart.migrated"
+    fi
+fi
+
+# --- 3. migrate the domain database and the history directory --------------
+for old in /etc/trafficchart-data \
+           /etc/trafficchart-domains \
+           /etc/trafficchart-domain-groups \
+           /etc/trafficchart-domains.state; do
+    new=$(printf '%s' "$old" | sed 's#/trafficchart#/ctstat#')
+    [ -e "$old" ] || continue
+    if [ -e "$new" ]; then
+        rm -rf "$old"
+    else
+        mv "$old" "$new" 2>/dev/null && log "moved $old -> $new"
+    fi
+done
+
+# The internal-flash store moved from /etc/trafficchart-data to /etc/ctstat-data,
+# so a target pointing there has to follow. User-chosen paths below /mnt, /media
+# or /tmp/mnt are directory *names*: rewriting them would point at a directory
+# that does not exist and silently drop the stored history, so they stay as-is.
+if command -v uci >/dev/null 2>&1 && [ -f /etc/config/ctstat ]; then
+    uci_changed=0
+    for sec in $(uci -q show ctstat 2>/dev/null | sed -n 's/^ctstat\.\([^.=]*\)\.path=.*/\1/p'); do
+        path=$(uci -q get "ctstat.$sec.path" 2>/dev/null)
+        case "$path" in
+            /etc/trafficchart-data|/etc/trafficchart-data/*)
+                new_path=$(printf '%s' "$path" | sed 's#^/etc/trafficchart-data#/etc/ctstat-data#')
+                uci -q set "ctstat.$sec.path=$new_path" && uci_changed=1
+                ;;
+        esac
+    done
+    [ "$uci_changed" = 1 ] && uci -q commit ctstat
+fi
+
+# --- 4. point SQM queues at the renamed classifier -------------------------
+if command -v uci >/dev/null 2>&1; then
+    changed=0
+    for sec in $(uci -q show sqm 2>/dev/null |
+        sed -n "s/^sqm\.\([^.=]*\)\.script='\(nss-rk\|nss-trafficchart\)\.qos'\$/\1/p"); do
+        uci -q set "sqm.$sec.script=nss-ctstat.qos" && changed=1
+    done
+    if [ "$changed" = 1 ]; then
+        uci -q commit sqm
+        log "SQM classifier renamed to nss-ctstat.qos in /etc/config/sqm; restart SQM to apply"
+    fi
+fi
+rm -f /usr/lib/sqm/nss-rk.qos /usr/lib/sqm/nss-rk.qos.help \
+      /usr/lib/sqm/nss-trafficchart.qos /usr/lib/sqm/nss-trafficchart.qos.help
+
+# --- 5. remove what the old package left behind ----------------------------
+# The old and the new package have different names, so opkg treats them as two
+# independent packages and keeps the old files when only the new one is
+# installed. Duplicate menu entries and two aggregators reading the same
+# conntrack table are worse than a slightly inconsistent opkg database, which
+# is why these files are removed here.
+removed=0
+for f in /etc/init.d/trafficchart \
+         /etc/sysctl.d/99-trafficchart.conf \
+         /usr/share/luci/menu.d/luci-app-traffic-chart.json \
+         /usr/share/rpcd/acl.d/luci-app-traffic-chart.json \
+         /usr/libexec/trafficchart-agg \
+         /usr/libexec/trafficchart-apps \
+         /usr/libexec/trafficchart-common \
+         /usr/libexec/trafficchart-dns \
+         /usr/libexec/trafficchart-domains \
+         /usr/libexec/trafficchart-domains-update \
+         /usr/libexec/trafficchart-hosts \
+         /usr/libexec/trafficchart-migrate \
+         /usr/libexec/trafficchart-persist-exec \
+         /usr/libexec/trafficchart-tc \
+         /usr/libexec/trafficchart-v6prefixes \
+         /usr/libexec/rpcd/luci.trafficchart; do
+    if [ -e "$f" ]; then
+        rm -f "$f" && removed=1
+    fi
+done
+if [ -d /www/luci-static/resources/view/traffic-chart ]; then
+    rm -rf /www/luci-static/resources/view/traffic-chart && removed=1
+fi
+# The old enable/disable links become dangling once the init script is gone.
+rm -f /etc/rc.d/*trafficchart
+# Translation catalogues and their uci-defaults belong to the old i18n packages.
+rm -f /usr/lib/lua/luci/i18n/trafficchart.*.lmo \
+      /etc/uci-defaults/luci-i18n-traffic-chart-* 2>/dev/null
+if [ -d /var/run/trafficchart ]; then
+    rm -rf /var/run/trafficchart
+fi
+[ "$removed" = 1 ] && log "previous luci-app-traffic-chart files removed"
+
+# opkg holds its lock while postinst runs, so "opkg list-installed" is not
+# reliable here. The status database is a plain file and can be read directly.
+if grep -q '^Package: luci-app-traffic-chart$' /usr/lib/opkg/status 2>/dev/null; then
+    log "luci-app-traffic-chart is still listed by opkg; run: opkg remove --force-depends luci-app-traffic-chart luci-i18n-traffic-chart-zh-cn luci-i18n-traffic-chart-zh-tw"
+fi
+
+exit 0

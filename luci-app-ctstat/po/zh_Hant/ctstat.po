@@ -1,0 +1,1054 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-ctstat 1.2.0\n"
+"Report-Msgid-Bugs-To: https://github.com/YunHair/luci-app-ctstat/issues\n"
+"POT-Creation-Date: 2026-11-24 00:00+0800\n"
+"PO-Revision-Date: 2026-11-24 00:00+0800\n"
+"Last-Translator: YunHair\n"
+"Language-Team: 正體中文 (Traditional Chinese)\n"
+"Language: zh_Hant\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid " available V2Fly groups. The selector has been refreshed."
+msgstr " 個可用的 V2Fly 分組。選擇列表已重新整理。"
+
+msgid "\"auto\" or a number of bytes (0-99)."
+msgstr "“auto”或位元組數（0-99）。"
+
+msgid "%.1f days"
+msgstr "%.1f 天"
+
+msgid "%.1f h"
+msgstr "%.1f 小時"
+
+msgid "%.2f drops/s, %.2f ECN marks/s (%s)"
+msgstr "%.2f 丟包/秒，%.2f ECN 標記/秒（%s）"
+
+msgid "%d buckets not written yet"
+msgstr "%d 個分桶尚未寫入"
+
+msgid "%d flows w/o counters"
+msgstr "%d 條連線無計數器"
+
+msgid "%d min"
+msgstr "%d 分鐘"
+
+msgid "%s (%d active)"
+msgstr "%s（%d 個活動）"
+
+msgid "%s is not available (yet) - it gets everything it missed as soon as it is back%s."
+msgstr "%s（還）不可用 - 它恢復後會補上遺漏的全部資料%s。"
+
+msgid "* Note: rates are the mean of the last %d s, measured by the ctstat-agg daemon on its own clock (bytes per application, device and destination from /proc/net/nf_conntrack, application names from netifyd). The link rate comes from the tc qdisc counters read in the same instant. \"Not attributed\" is what the shaper carries but conntrack does not count (after subtracting the link layer header): e.g. traffic to router services, dropped inbound packets, multicast."
+msgstr "* 說明：速率是最近 %d 秒的平均值，由 ctstat-agg 守護程序按其自身時鐘測量（按應用、裝置和目標統計的位元組數來自 /proc/net/nf_conntrack，應用名來自 netifyd）。鏈路速率來自同一時刻讀取的 tc qdisc 計數器。“未歸屬”是整形器實際承載、但 conntrack 未統計的部分（已扣除鏈路層包頭）：例如訪問路由器服務的流量、被丟棄的入站包、組播。"
+
+msgid "1 hour (default)"
+msgstr "1 小時（預設）"
+
+msgid "15 minutes"
+msgstr "15 分鐘"
+
+msgid "24 hours"
+msgstr "24 小時"
+
+msgid "5 min"
+msgstr "5 分鐘"
+
+msgid "5 minutes"
+msgstr "5 分鐘"
+
+msgid "5-minute bucket count"
+msgstr "5 分鐘分桶數量"
+
+msgid "5-minute bucket length"
+msgstr "5 分鐘分桶長度"
+
+msgid "5-minute buckets kept"
+msgstr "保留的 5 分鐘分桶數"
+
+msgid "6 hours"
+msgstr "6 小時"
+
+msgid "95% of the time the rate was at or below this value (time-weighted)"
+msgstr "95% 的時間內速率不超過該值（按時間加權）"
+
+msgid "95th percentile"
+msgstr "95 分位"
+
+msgid "A fraction between 0 and 1 (e.g. 0.6)."
+msgstr "0 到 1 之間的小數（例如 0.6）。"
+
+msgid "A fraction greater than 0 and less than 1 (e.g. 0.25)."
+msgstr "大於 0 且小於 1 的小數（例如 0.25）。"
+
+msgid "A process is restarted when it uses this many MB more than it did after its start-up. Applies to each process on its own. Default: 48. Lower = restarts more often, higher = more memory may be used before the restart."
+msgstr "程序佔用的記憶體比啟動時多出該 MB 數後會被重啟。分別對每個程序生效。預設：48。值越小重啟越頻繁，值越大重啟前允許佔用更多記憶體。"
+
+msgid "A restart of the DNS or application-name reader loses nothing that matters (the DNS names are reloaded from disk, application labels reappear as flows are seen again). A restart of the aggregator starts the cumulative totals again; the history is kept."
+msgstr "重啟 DNS 或應用名讀取程序不會丟失重要資料（DNS 名稱會從磁碟重新載入，應用標籤會在再次看到流量時恢復）。重啟聚合程序會重新開始累計總量；歷史資料保留。"
+
+msgid "A router application must account for at least this fraction of total router WAN volume to be a candidate for attribution (prevents background traffic from being mis-credited). Default: 0.25 (25 %)."
+msgstr "路由器應用必須至少佔路由器 WAN 總流量的該比例，才會成為歸屬候選（防止後臺流量被誤歸屬）。預設：0.25（25%）。"
+
+msgid "A service database update is already being monitored."
+msgstr "已在監視一次服務庫更新。"
+
+msgid "Access timeout"
+msgstr "訪問逾時"
+
+msgid "Add location"
+msgstr "新增位置"
+
+msgid "Additional DNS resolvers"
+msgstr "附加 DNS 解析器"
+
+msgid "Advanced"
+msgstr "高階"
+
+msgid "Application"
+msgstr "應用"
+
+msgid "Application names"
+msgstr "應用名稱"
+
+msgid "Applications"
+msgstr "應用"
+
+msgid "Applications kept individually; further ones are summed as \"(other)\". Default: 400."
+msgstr "單獨統計的應用數量；其餘合併為“(其他)”。預設：400。"
+
+msgid "Attribution window"
+msgstr "歸屬視窗"
+
+msgid "Auto"
+msgstr "自動"
+
+msgid "Auto selects NSS hardware offload if the nssifb device exists and the nss_ifb module is loaded, otherwise the generic reader."
+msgstr "如果存在 nssifb 裝置且已載入 nss_ifb 模組，則自動選擇 NSS 硬體加速，否則使用通用讀取器。"
+
+msgid "Automatic service-list update"
+msgstr "自動更新服務庫"
+
+msgid "Average"
+msgstr "平均"
+
+msgid "Average rate per column (%s), %s - %s."
+msgstr "各列平均速率（%s），%s - %s。"
+
+msgid "Both"
+msgstr "雙向"
+
+msgid "Both the router application pool and the device pool must hold at least this many bytes before a pair is attempted. Prevents tiny background flows from being mis-attributed. Default: 262144 (256 KiB)."
+msgstr "路由器應用池和裝置池都必須至少有這麼多位元組，才會嘗試配對，防止微小的後臺流量被誤歸屬。預設：262144（256 KiB）。"
+
+msgid "Bulk threshold (bytes)"
+msgstr "批次閾值（位元組）"
+
+msgid "Busiest flows (smoothed rate, top 25)"
+msgstr "最繁忙的連線（平滑速率，前 25 條）"
+
+msgid "BusyBox awk (the OpenWrt default) can leak memory in long running scripts - on a busy network tens of MB per day. The guard watches the background processes (aggregator, DNS reader, application-name reader) and restarts one of them when its memory grew by more than the limit below since it started. Installing gawk (apk add gawk / opkg install gawk) avoids the leak, the scripts use it automatically when it is present."
+msgstr "BusyBox awk（OpenWrt 預設）在長時間執行的指令碼中可能洩漏記憶體 - 繁忙網路下每天可達數十 MB。守護功能會監視後臺程序（聚合程序、DNS 讀取程序、應用名讀取程序），當某個程序的記憶體比啟動時增長超過下面的限制時就重啟它。安裝 gawk（apk add gawk / opkg install gawk）可以避免洩漏，指令碼檢測到 gawk 時會自動使用。"
+
+msgid "Bytes per packet the shaper counts but conntrack does not (used for \"Not attributed\"). \"auto\" measures it; or a fixed number: 14 Ethernet, 18 +VLAN, 22 +PPPoE, 26 +PPPoE+VLAN, 0 = no correction."
+msgstr "整形器統計但 conntrack 未統計的每包位元組數（用於“未歸屬”）。“auto”表示自動測量；也可填固定值：14 乙太網，18 +VLAN，22 +PPPoE，26 +PPPoE+VLAN，0 = 不修正。"
+
+msgid "Changed: "
+msgstr "已更改："
+
+msgid "Clear all cumulative totals and history? This cannot be undone from here (buckets already saved to a storage path, if any, are kept)."
+msgstr "清空所有累計總量和歷史？此操作無法從介面撤銷（已寫入儲存位置的分桶，如有，會保留）。"
+
+msgid "Clear history"
+msgstr "清空歷史"
+
+msgid "Click to hide or show"
+msgstr "點選隱藏或顯示"
+
+msgid "Comma-separated interface names on which client DNS queries are observed. Usually br-lan; for example, br-lan,br-guest. Multiple interfaces are filtered from tcpdump on Linux's any device. Avoid listing overlapping bridge and member interfaces when possible."
+msgstr "監聽客戶端 DNS 查詢的介面名，逗號分隔。通常是 br-lan；例如 br-lan,br-guest。多個介面會從 Linux any 裝置上的 tcpdump 結果中過濾出來。請儘量避免同時列出網橋和其成員介面。"
+
+msgid "Compare"
+msgstr "對比"
+
+msgid "Computed from the stored buckets (%s each), so short bursts inside a bucket are averaged out."
+msgstr "根據已儲存的分桶計算（每桶 %s），因此桶內的短時突發會被平均掉。"
+
+msgid "Could not clear history: "
+msgstr "無法清空歷史："
+
+msgid "Could not read update status: "
+msgstr "無法讀取更新狀態："
+
+msgid "Could not read update status; retrying: "
+msgstr "無法讀取更新狀態，正在重試："
+
+msgid "DNS capture interfaces"
+msgstr "DNS 抓包介面"
+
+msgid "DNS domain names"
+msgstr "DNS 網域"
+
+msgid "Daily"
+msgstr "每天"
+
+msgid "Daily buckets kept"
+msgstr "保留的每日分桶數"
+
+msgid "Dashed line: the same length of time before the shown period"
+msgstr "虛線：當前時間段之前同樣長度的時間段"
+
+msgid "Default: 288 × 300 s = 24 h."
+msgstr "預設：288 × 300 秒 = 24 小時。"
+
+msgid "Destination"
+msgstr "目標"
+
+msgid "Destinations"
+msgstr "目標"
+
+msgid "Destinations kept individually; idle ones are folded into \"(other)\" when the table is full. Default: 200."
+msgstr "單獨統計的目標數量；表格滿後空閒目標會合併為“(其他)”。預設：200。"
+
+msgid "Detailed tooltips"
+msgstr "詳細懸浮提示"
+
+msgid "Detect resolvers from DHCP"
+msgstr "從 DHCP 檢測解析器"
+
+msgid "Device"
+msgstr "裝置"
+
+msgid "Devices"
+msgstr "裝置"
+
+msgid "Devices and destinations listed individually in the live data (the most active ones); the rest is summed as \"(other)\". 0 = list everything. Default: 40."
+msgstr "實時資料中單獨列出的裝置和目標數量（最活躍的）；其餘合併為“(其他)”。0 = 全部列出。預設：40。"
+
+msgid "Disable to stop the aggregator entirely."
+msgstr "禁用後完全停止聚合程序。"
+
+msgid "Download"
+msgstr "下載"
+
+msgid "Download and compile the current v2fly/domain-list-community release now. The live DNS watcher continues using the previous list until the new file is complete."
+msgstr "立即下載並編譯當前的 v2fly/domain-list-community 釋出版本。新檔案下載完成前，正在執行的 DNS 監視仍使用舊列表。"
+
+msgid "Download shaper"
+msgstr "下載整形器"
+
+msgid "Download the current v2fly domain-list-community database in the background and rebuild the local service lookup. The router only keeps the compact lookup file."
+msgstr "在後臺下載當前的 v2fly domain-list-community 資料庫並重建本地服務查詢表。路由器只保留精簡後的查詢檔案。"
+
+msgid "Drops are normal codel behaviour under load. \"Limit hits\" > 0 mean the queue limit was exceeded (limit too small for the link speed)."
+msgstr "負載下 codel 丟包是正常現象。“超限次數”大於 0 表示佇列上限被超過（上限相對鏈路速率過小）。"
+
+msgid "ECN Marks"
+msgstr "ECN 標記"
+
+msgid "ECN marks"
+msgstr "ECN 標記"
+
+msgid "ERROR: "
+msgstr "錯誤："
+
+msgid "Each interface must be 1–15 characters: A-Z, 0-9, dot, underscore or hyphen; separate interfaces with commas."
+msgstr "每個介面必須為 1-15 個字元：A-Z、0-9、點、下劃線或連字元；多個介面用逗號分隔。"
+
+msgid "Empty = auto-detect (shaped devices are found in the kernel: ingress redirect to an ifb, or NSS nsstbl; otherwise the default route device). Set device names (e.g. eth1 pppoe-wan) or logical interfaces (wan), space separated, to override."
+msgstr "留空 = 自動檢測（在核心中查詢整形裝置：ingress 重定向到 ifb，或 NSS nsstbl；否則使用預設路由裝置）。可填寫裝置名（如 eth1 pppoe-wan）或邏輯介面（wan），空格分隔，以覆蓋自動檢測。"
+
+msgid "Enable"
+msgstr "啟用"
+
+msgid "Enable memory guard"
+msgstr "啟用記憶體守護"
+
+msgid "Enter a path."
+msgstr "請輸入路徑。"
+
+msgid "Enter a whole number for %s."
+msgstr "請為%s輸入整數。"
+
+msgid "Enter a whole number from %d to %d for %s."
+msgstr "請為%s輸入 %d 到 %d 之間的整數。"
+
+msgid "Enter a whole number of at least %d for %s."
+msgstr "請為%s輸入不小於 %d 的整數。"
+
+msgid "Enter a whole number of days (at least 1)."
+msgstr "請輸入整數天數（至少 1 天）。"
+
+msgid "Enter one path per row."
+msgstr "每行只能填寫一個路徑。"
+
+msgid "Entries: "
+msgstr "條目："
+
+msgid "Error: %s"
+msgstr "錯誤：%s"
+
+msgid "Error: No data received. Is the ctstat service running (/etc/init.d/ctstat start)?"
+msgstr "錯誤：未收到資料。ctstat 服務是否在執行（/etc/init.d/ctstat start）？"
+
+msgid "Error: No response from ctstat RPC. Is the ctstat service running (/etc/init.d/ctstat start)?"
+msgstr "錯誤：ctstat RPC 無回應。ctstat 服務是否在執行（/etc/init.d/ctstat start）？"
+
+msgid "Export CSV"
+msgstr "匯出 CSV"
+
+msgid "Export JSON"
+msgstr "匯出 JSON"
+
+msgid "Export the current data as CSV"
+msgstr "將當前資料匯出為 CSV"
+
+msgid "Export the current data as JSON"
+msgstr "將當前資料匯出為 JSON"
+
+msgid "Export the shown history range (all buckets, applications, devices and destinations) as CSV"
+msgstr "將顯示的歷史範圍（所有分桶、應用、裝置和目標）匯出為 CSV"
+
+msgid "Export the shown history range (all buckets, applications, devices and destinations) as JSON"
+msgstr "將顯示的歷史範圍（所有分桶、應用、裝置和目標）匯出為 JSON"
+
+msgid "Fine-tuning for the attribution algorithm. The defaults work well for typical stream proxies. Only relevant when \"Router proxy attribution\" is enabled above."
+msgstr "歸屬演算法的微調引數。預設值適用於常見的流媒體代理。僅當上方啟用了“路由器代理流量歸屬”時相關。"
+
+msgid "Flows"
+msgstr "連線"
+
+msgid "General"
+msgstr "常規"
+
+msgid "Generic (cake / htb+fq_codel / any other qdisc)"
+msgstr "通用（cake / htb+fq_codel / 其他 qdisc）"
+
+msgid "Highest bucket average in the period"
+msgstr "該時間段內分桶平均速率的最高值"
+
+msgid "Highest momentary queue backlog seen at a poll; in brackets the time the shaper needs to drain it at the configured rate"
+msgstr "每次輪詢看到的佇列積壓峰值；括號內為整形器按配置速率排空所需時間"
+
+msgid "History"
+msgstr "歷史"
+
+msgid "History and persistent storage"
+msgstr "歷史與持久化儲存"
+
+msgid "History could not be loaded (request to the aggregator failed). Retrying automatically."
+msgstr "歷史載入失敗（請求聚合程序失敗）。正在自動重試。"
+
+msgid "History storage locations"
+msgstr "歷史儲存位置"
+
+msgid "History tooltip details"
+msgstr "歷史懸浮提示詳情"
+
+msgid "Hourly"
+msgstr "每小時"
+
+msgid "Hourly buckets kept"
+msgstr "保留的每小時分桶數"
+
+msgid "How often the automatic v2fly list refresh is allowed. A manual update is always possible. Default: 7 days."
+msgstr "允許自動重新整理 v2fly 列表的間隔。隨時可以手動更新。預設：7 天。"
+
+msgid "INCOMING SHARE"
+msgstr "入站佔比"
+
+msgid "Incoming (Download)"
+msgstr "入站（下載）"
+
+msgid "Interfaces excluded from the redirect"
+msgstr "不參與重定向的介面"
+
+msgid "Keep application names after attribution"
+msgstr "歸屬後保留應用名稱"
+
+msgid "Last attempt: "
+msgstr "上次嘗試："
+
+msgid "Last successful update: "
+msgstr "上次成功更新："
+
+msgid "Legacy warning keywords"
+msgstr "舊版告警關鍵詞"
+
+msgid "Link header size"
+msgstr "鏈路層包頭大小"
+
+msgid "Link rate not available (no tc counters)"
+msgstr "鏈路速率不可用（無 tc 計數器）"
+
+msgid "Loaded "
+msgstr "已載入 "
+
+msgid "Loading..."
+msgstr "載入中..."
+
+msgid "Loading…"
+msgstr "載入中…"
+
+msgid "Maintains the application x destination, destination x device and device x application tables that feed the \"top destinations / devices / applications\" tooltips of the live view. Costs CPU on every accounted flow delta. Disabling leaves the tooltips empty; totals and the History tab are not affected."
+msgstr "維護“應用 × 目標”“目標 × 裝置”“裝置 × 應用”三張表，為實時檢視的“熱門目標/裝置/應用”懸浮提示提供資料。每處理一條流量的增量都會消耗 CPU。禁用後懸浮提示為空；總量和歷史頁不受影響。"
+
+msgid "Max applications"
+msgstr "最大應用數"
+
+msgid "Max candidate applications"
+msgstr "最大候選應用數"
+
+msgid "Max candidate devices"
+msgstr "最大候選裝置數"
+
+msgid "Max destinations"
+msgstr "最大目標數"
+
+msgid "Maximum fractional volume difference between a router application and a device pool for a match (0 – 1). Lower = stricter matching. Default: 0.6 (60 %)."
+msgstr "路由器應用與裝置池匹配時允許的最大流量比例差（0 - 1）。值越小匹配越嚴格。預設：0.6（60%）。"
+
+msgid "Maximum number of LAN devices considered for attribution per poll (largest pool first). 0 = unlimited. Default: 64."
+msgstr "每次輪詢參與歸屬計算的區域網裝置數上限（先取流量最大的）。0 = 不限制。預設：64。"
+
+msgid "Maximum number of router applications considered for attribution per poll (largest first). 0 = unlimited. Default: 64."
+msgstr "每次輪詢參與歸屬計算的路由器應用數上限（先取流量最大的）。0 = 不限制。預設：64。"
+
+msgid "Measuring real interface throughput..."
+msgstr "正在測量真實介面吞吐..."
+
+msgid "Memory growth limit (MB)"
+msgstr "記憶體增長上限（MB）"
+
+msgid "Memory guard"
+msgstr "記憶體守護"
+
+msgid "Minimum bytes for pairing"
+msgstr "配對的最小位元組數"
+
+msgid "Minimum router application share"
+msgstr "路由器應用最小佔比"
+
+msgid "Month"
+msgstr "月"
+
+msgid "NSS hardware offload"
+msgstr "NSS 硬體加速"
+
+msgid "NSS hardware offload bypasses nftables for accelerated flows; conntrack byte counters keep advancing under offload, which is why they are used."
+msgstr "NSS 硬體加速會讓已加速的連線繞過 nftables；但 conntrack 位元組計數器在加速下仍會增長，因此使用它來統計。"
+
+msgid "Never"
+msgstr "從不"
+
+msgid "No"
+msgstr "否"
+
+msgid "No active flows"
+msgstr "當前沒有活動連線"
+
+msgid "No data for this range yet - hourly buckets are closed at the full hour, daily buckets at midnight (and when the service is stopped)."
+msgstr "該範圍還沒有資料 - 每小時分桶在整點關閉，每日分桶在零點關閉（服務停止時也會關閉）。"
+
+msgid "No final update status was received after 20 minutes. Last status error: "
+msgstr "20 分鐘後仍未收到最終更新狀態。最後的狀態錯誤："
+
+msgid "No final update status was received after 20 minutes. The updater may still be running; reload this page to check its status."
+msgstr "20 分鐘後仍未收到最終更新狀態。更新程序可能仍在執行；重新整理本頁檢視狀態。"
+
+msgid "No history yet - the first bucket is written 5 minutes after the aggregator started."
+msgstr "還沒有歷史資料 - 聚合程序啟動 5 分鐘後寫入第一個分桶。"
+
+msgid "No new update state appeared yet. Status checks will continue; the updater may be starting or already running."
+msgstr "尚未出現新的更新狀態。狀態檢查會繼續；更新程序可能正在啟動或已在執行。"
+
+msgid "No warning groups — disable group warnings"
+msgstr "無告警分組 — 禁用分組告警"
+
+msgid "Normalise TTL / hop limit"
+msgstr "規範化 TTL / 跳數"
+
+msgid "Not attrib. (N/C)"
+msgstr "未歸屬（無計數器）"
+
+msgid "Not attrib. (sync jitter)"
+msgstr "未歸屬（同步抖動）"
+
+msgid "OUTGOING SHARE"
+msgstr "出站佔比"
+
+msgid "Only used when the field above is empty: ports that never count as \"router is serving this device\" (SSH, DNS, DHCP, NTP, DoT, mDNS, LuCI ...)."
+msgstr "僅當上方欄位為空時使用：永遠不算作“路由器在服務該裝置”的埠（SSH、DNS、DHCP、NTP、DoT、mDNS、LuCI ...）。"
+
+msgid "Open settings to enable it"
+msgstr "開啟設定以啟用"
+
+msgid "Optional application-name matches. Plain terms match anywhere (case-insensitive); use * for any text and ? for one character. Multiple terms can be separated by spaces or commas. V2Fly group warnings are configured above."
+msgstr "可選的應用名匹配。普通詞為任意位置匹配（不區分大小寫）；* 匹配任意文字，? 匹配單個字元。多個詞可用空格或逗號分隔。V2Fly 分組告警在上方配置。"
+
+msgid "Options of the nss-ctstat.qos nftables classifier (not used by the chart). DNS redirect and TTL rewrite are off by default. Restart SQM after changing them."
+msgstr "nss-ctstat.qos nftables 分類器的選項（圖表不使用）。DNS 重定向和 TTL 改寫預設關閉。修改後請重啟 SQM。"
+
+msgid "Other (%d applications)"
+msgstr "其他（%d 個應用）"
+
+msgid "Other (%d destinations)"
+msgstr "其他（%d 個目標）"
+
+msgid "Other (%d devices)"
+msgstr "其他（%d 個裝置）"
+
+msgid "Other (%d)"
+msgstr "其他（%d）"
+
+msgid "Outgoing (Upload)"
+msgstr "出站（上傳）"
+
+msgid "Path"
+msgstr "路徑"
+
+msgid "Path of the netifyd JSON socket."
+msgstr "netifyd JSON 套接字路徑。"
+
+msgid "Peak"
+msgstr "峰值"
+
+msgid "Peak backlog"
+msgstr "積壓峰值"
+
+msgid "Percentages refer to the configured SQM rate."
+msgstr "百分比相對於配置的 SQM 速率。"
+
+msgid "Poll interval"
+msgstr "輪詢間隔"
+
+msgid "Port"
+msgstr "埠"
+
+msgid "Port(s) of a stream proxy running on the router itself, space separated. Traffic served to LAN devices through these ports is credited to the device instead of showing up as generic \"Router\" traffic. Leave empty to use every port except the infrastructure ports below."
+msgstr "執行在路由器本機的流媒體代理埠，空格分隔。經由這些埠提供給區域網裝置的流量會記到對應裝置，而不是籠統顯示為“路由器”流量。留空表示使用除下方基礎設施埠之外的所有埠。"
+
+msgid "Ports in %s must be between 1 and 65535."
+msgstr "%s中的埠必須在 1 到 65535 之間。"
+
+msgid "Previous period"
+msgstr "上一週期"
+
+msgid "Previous period (partial, %d%% coverage)"
+msgstr "上一週期（部分，覆蓋率 %d%%）"
+
+msgid "Previous period: no data stored yet"
+msgstr "上一週期：尚未儲存資料"
+
+msgid "Querying conntrack via ubus..."
+msgstr "正在透過 ubus 查詢 conntrack..."
+
+msgid "Rate averaging window"
+msgstr "速率平均視窗"
+
+msgid "Reads the DNS servers the router hands out to its clients (DHCP option 6, IPv6 RDNSS) and treats them as central resolvers: their lookups towards the internet are used for every client. Needed when the clients talk to the resolver inside the switch."
+msgstr "讀取路由器分配給客戶端的 DNS 伺服器（DHCP 選項 6、IPv6 RDNSS），把它們視為中心解析器：它們發往網際網路的查詢會用於所有客戶端。當客戶端在交換機內部訪問解析器時需要此功能。"
+
+msgid "Recent drop rate (red) / ECN rate (amber), roughly the last %d polls."
+msgstr "最近的丟包率（紅色）/ ECN 率（琥珀色），約為最近 %d 次輪詢。"
+
+msgid "Redirect DNS to the router"
+msgstr "把 DNS 重定向到路由器"
+
+msgid "Redirects DNS (port 53, UDP and TCP) coming from every non-WAN interface to the router's own resolver. Also hits VPN interfaces and clients that use their own resolver - use the exclusion list below if that is not wanted."
+msgstr "把所有非 WAN 介面發出的 DNS（53 埠，UDP 和 TCP）重定向到路由器自身的解析器。也會影響 VPN 介面和使用自有解析器的客戶端 - 如不需要，請用下方的排除列表。"
+
+msgid "Remembers conntrack entries that did not move a byte since the last poll and accepts them again without parsing them. Cuts the CPU load of the aggregator on a normal network (most connections are idle) to roughly a half or a third. Costs about 1 kB of RAM per remembered connection (at most 20000) and a few percent more CPU if every connection is busy. The results are identical either way; switch it off to compare or if RAM is tight."
+msgstr "記住自上次輪詢以來沒有位元組變化的 conntrack 條目，下次直接複用而不再解析。在普通網路（大多數連線空閒）中可把聚合程序的 CPU 佔用降到約一半到三分之一。每條記住的連線約佔用 1 kB 記憶體（最多 20000 條）；如果所有連線都繁忙，CPU 會多幾個百分點。兩種方式結果相同；可用於對比或記憶體緊張時關閉。"
+
+msgid "Reset connection marks on SQM start"
+msgstr "SQM 啟動時重置連線標記"
+
+msgid "Resets the cumulative application/device/destination totals and the stored history, without restarting the service. Buckets already written to a storage path (if configured) are kept."
+msgstr "清空應用/裝置/目標的累計總量和已儲存的歷史，但不重啟服務。已寫入儲存位置（如已配置）的分桶會保留。"
+
+msgid "Resolvers that are not announced by DHCP (static client settings). Pi-hole / AdGuard resolvers handed out by DHCP option 6 or IPv6 RDNSS are found automatically. Space separated addresses; use this when clients talk to them inside the switch, so only the resolvers' own lookups towards the internet reach the capture interface: those answers then count for every client."
+msgstr "不由 DHCP 通告的解析器（客戶端靜態設定）。透過 DHCP 選項 6 或 IPv6 RDNSS 下發的 Pi-hole / AdGuard 解析器會被自動發現。位址用空格分隔；當客戶端在交換機內部訪問這些解析器時使用，這樣只有解析器自身發往網際網路的查詢會到達抓包介面，這些應答就會計入所有客戶端。"
+
+msgid "Restart service"
+msgstr "重啟服務"
+
+msgid "Restarting..."
+msgstr "正在重啟..."
+
+msgid "Rewrites packets with TTL/hop limit 63 or 127 to 64."
+msgstr "把 TTL/跳數為 63 或 127 的資料包改寫為 64。"
+
+msgid "Router infrastructure ports"
+msgstr "路由器基礎設施埠"
+
+msgid "Router proxy attribution"
+msgstr "路由器代理流量歸屬"
+
+msgid "Router proxy attribution – thresholds"
+msgstr "路由器代理流量歸屬 - 閾值"
+
+msgid "Router proxy port(s)"
+msgstr "路由器代理埠"
+
+msgid "Rows listed individually"
+msgstr "單獨列出的行數"
+
+msgid "Run ctstat-apps (netifyd) to label flows by application. Needs socat + netifyd. Without it flows are named by protocol and port."
+msgstr "執行 ctstat-apps（netifyd）按應用標記連線。需要 socat + netifyd。沒有時連線按協議和埠命名。"
+
+msgid "SQM classifier (nss-ctstat.qos)"
+msgstr "SQM 分類器（nss-ctstat.qos）"
+
+msgid "Saved to %s (last write: %s%s)."
+msgstr "已儲存到 %s（上次寫入：%s%s）。"
+
+msgid "Seconds an access to a target may take before it is given up (3-120). Use the \"soft\" mount option for network shares."
+msgstr "訪問儲存位置允許耗費的秒數，逾時後放棄（3-120）。網路共享請使用“soft”掛載選項。"
+
+msgid "Seconds between conntrack passes (default 4; stretches automatically under load)."
+msgstr "兩次 conntrack 掃描之間的秒數（預設 4；負載高時自動拉長）。"
+
+msgid "Seconds between two writes to the storage (minimum 60). A clean stop, restart or reboot always writes everything."
+msgstr "兩次寫入儲存之間的秒數（最小 60）。正常停止、重啟或重啟系統時總會寫入全部資料。"
+
+msgid "Seconds over which the live rates are averaged (default 20, minimum 2 x poll interval). Shorter = the display follows load changes faster, but is more jittery. For the fastest display use poll interval 2 and a window of 4-6."
+msgstr "實時速率的平均時間（預設 20，最小為輪詢間隔的 2 倍）。越短顯示越跟得上負載變化，但抖動越大。要最快顯示，請把輪詢間隔設為 2、視窗設為 4-6。"
+
+msgid "Seconds per bucket of the finest resolution (24 hours view). Default: 300."
+msgstr "最細解析度（24 小時檢視）每個分桶的秒數。預設：300。"
+
+msgid "Seconds: how long accumulated bytes stay in the pairing pool. Router WAN bytes that find no matching device pool within this window stay on the Router device. Default: 60 s."
+msgstr "秒：累計位元組在配對池中保留的時間。在此視窗內找不到匹配裝置池的路由器 WAN 位元組會留在“路由器”裝置上。預設：60 秒。"
+
+msgid "Select one or more groups from the installed v2fly database. A red warning is shown when a domain belongs to any selected group. Select “No warning groups” to disable these warnings (it overrides any group selections). Update the service database below to refresh this list."
+msgstr "從已安裝的 v2fly 資料庫中選擇一個或多個分組。網域屬於任一選中分組時會顯示紅色告警。選擇“無告警分組”可禁用這些告警（會覆蓋所有分組選擇）。更新下方的服務資料庫可重新整理此列表。"
+
+msgid "Service database"
+msgstr "服務資料庫"
+
+msgid "Service-list refresh interval (days)"
+msgstr "服務庫重新整理間隔（天）"
+
+msgid "Settings"
+msgstr "設定"
+
+msgid "Settings for the ctstat aggregator (ctstat-agg). Saving restarts the aggregator (cumulative totals reset, the history survives)."
+msgstr "ctstat 聚合程序（ctstat-agg）的設定。儲存會重啟聚合程序（累計總量清零，歷史保留）。"
+
+msgid "Shaper Drops"
+msgstr "整形器丟包"
+
+msgid "Shaper backend"
+msgstr "整形器後端"
+
+msgid "Shaper drops"
+msgstr "整形器丟包"
+
+msgid "Shaper drops (strip opacity = intensity relative to the worst column shown)"
+msgstr "整形器丟包（豎條透明度 = 相對於圖中最差列的強度）"
+
+msgid "Skip unchanged connections"
+msgstr "跳過未變化的連線"
+
+msgid "Space separated device names (e.g. wg0 tun0) whose DNS is left alone."
+msgstr "不重定向 DNS 的裝置名，空格分隔（例如 wg0 tun0）。"
+
+msgid "Starting service database update…"
+msgstr "正在啟動服務資料庫更新…"
+
+msgid "Statistics for the shown period"
+msgstr "所選時間段的統計"
+
+msgid "Stores, per history bucket, the top destinations of each application, the top applications of each device and the top devices of each destination, so the History tooltips show the same as the live ones. Makes the history files and their RAM mirror several times larger; disabling it (or disabling detailed tooltips) leaves the History tooltips with the plain list of the same dimension. Applies to new buckets only."
+msgstr "按歷史分桶儲存每個應用的熱門目標、每個裝置的熱門應用和每個目標的熱門裝置，使歷史懸浮提示與實時檢視一致。會讓歷史檔案及其記憶體鏡像增大數倍；禁用後（或禁用詳細懸浮提示），歷史懸浮提示只顯示同一維度的普通列表。僅對新的分桶生效。"
+
+msgid "TCP/UDP flows already classified as WEB, P2P or best-effort are moved to BULK after this conntrack byte count. Default: 300 MiB."
+msgstr "已分類為 WEB、P2P 或盡力而為的 TCP/UDP 連線，在 conntrack 位元組數超過該值後轉為 BULK。預設：300 MiB。"
+
+msgid "The History tab keeps 5 minute buckets (24 hours), hourly buckets (week, month) and daily buckets (year). Without a storage path they live in RAM only and are lost on reboot."
+msgstr "歷史頁保留 5 分鐘分桶（24 小時）、每小時分桶（周、月）和每日分桶（年）。沒有儲存路徑時只儲存在記憶體中，重啟後丟失。"
+
+msgid "The Traffic Monitor service is disabled in the settings, so no data is collected."
+msgstr "設定中已關閉流量監控服務，因此不會採集資料。"
+
+msgid "The group list is not available yet. Run “Update now” below to download the v2fly database and populate this selector."
+msgstr "分組列表尚不可用。請點選下面的“立即更新”下載 v2fly 資料庫以填充此選擇列表。"
+
+msgid "The last refresh of this history failed - showing the most recently loaded data, which may be outdated. Retrying automatically."
+msgstr "該歷史資料的上次重新整理失敗 - 顯示的是最近一次成功載入的資料，可能已過期。正在自動重試。"
+
+msgid "The previous-period comparison could not be fully refreshed; it may use older or incomplete data."
+msgstr "上一週期對比未能完全重新整理；可能使用了較舊或不完整的資料。"
+
+msgid "The socket must be a .sock file directly below /var/run/netifyd."
+msgstr "套接字必須是 /var/run/netifyd 目錄下的 .sock 檔案。"
+
+msgid "The update is taking longer than 120 seconds. Status checks will continue; the updater may still be running."
+msgstr "更新已超過 120 秒。狀態檢查會繼續；更新程序可能仍在執行。"
+
+msgid "The update succeeded, but the group list could not be loaded. Reload this page to refresh the selector."
+msgstr "更新成功，但無法載入分組列表。請重新整理本頁以更新選擇列表。"
+
+msgid "This location is already listed in another row."
+msgstr "該位置已在另一行中列出。"
+
+msgid "Top applications"
+msgstr "熱門應用"
+
+msgid "Top destinations"
+msgstr "熱門目標"
+
+msgid "Top devices"
+msgstr "熱門裝置"
+
+msgid "Total %s - %s packets (%s)"
+msgstr "總計 %s - %s 個資料包（%s）"
+
+msgid "Traffic Monitor is disabled."
+msgstr "流量監控已禁用。"
+
+msgid "Tries to attribute the router's own WAN traffic (e.g. a stream proxy) to the LAN device it served, instead of showing it generically as \"Router\"."
+msgstr "嘗試把路由器自身的 WAN 流量（例如流媒體代理）歸屬到它所服務的區域網裝置，而不是籠統顯示為“路由器”。"
+
+msgid "Update now"
+msgstr "立即更新"
+
+msgid "Upload"
+msgstr "上傳"
+
+msgid "Upload shaper"
+msgstr "上傳整形器"
+
+msgid "Use /etc/ctstat-data (internal flash) or directories below /mnt, /media or /tmp/mnt; paths are separated by spaces."
+msgstr "使用 /etc/ctstat-data（內建快閃記憶體）或 /mnt、/media、/tmp/mnt 下的目錄；多個路徑用空格分隔。"
+
+msgid "Use IPv4 / IPv6 addresses separated by spaces."
+msgstr "請使用空格分隔的 IPv4 / IPv6 位址。"
+
+msgid "Use a comma-separated list of interface names (maximum 255 characters)."
+msgstr "請使用逗號分隔的介面名列表（最多 255 個字元）。"
+
+msgid "Use a refresh interval between 1 and 3650 days."
+msgstr "重新整理間隔請在 1 到 3650 天之間。"
+
+msgid "Use device or logical interface names containing only A-Z, 0-9, dot, underscore, @ and hyphen."
+msgstr "請使用只含 A-Z、0-9、點、下劃線、@ 和連字元的裝置名或邏輯介面名。"
+
+msgid "Use names seen for other devices"
+msgstr "使用其他裝置上看到的名稱"
+
+msgid "Use space-separated interface names of at most 15 characters."
+msgstr "請使用空格分隔的介面名，每個不超過 15 個字元。"
+
+msgid "Use space-separated numeric ports for %s."
+msgstr "請為%s使用空格分隔的數字埠。"
+
+msgid "V2Fly warning groups"
+msgstr "V2Fly 告警分組"
+
+msgid "Volume"
+msgstr "總量"
+
+msgid "Volume divided by the time the aggregator was running"
+msgstr "總量除以聚合程序執行時間"
+
+msgid "Volume tolerance"
+msgstr "流量容差"
+
+msgid "WAN device"
+msgstr "WAN 裝置"
+
+msgid "Warning: configured alert keyword found in this bucket"
+msgstr "警告：該分桶中發現配置的告警關鍵詞"
+
+msgid "Warning: matches a configured alert rule"
+msgstr "警告：命中已配置的告警規則"
+
+msgid "Watch clear-text DNS on the configured LAN interface with tcpdump. This works independently of netifyd and supplies domain/application names as a fallback."
+msgstr "用 tcpdump 在配置的區域網介面上監聽明文 DNS。它獨立於 netifyd 工作，作為網域/應用名的回退來源。"
+
+msgid "Week"
+msgstr "周"
+
+msgid "Week and month view. Default: 744 = 31 days."
+msgstr "周和月檢視。預設：744 = 31 天。"
+
+msgid "When nothing is known for a device itself, take the name the DNS capture saw for the same destination address - as long as exactly one name is known for it. Makes names appear when the devices talk to a central resolver (Pi-hole) inside the switch and only the resolver's own lookups are visible. A shared CDN address with several names is left unnamed."
+msgstr "當裝置本身沒有名稱時，採用 DNS 抓包中同一目標位址看到的名稱 - 前提是該位址只對應一個名稱。這樣當裝置訪問交換機內部的中心解析器（Pi-hole），而只能看到解析器自身查詢時也能顯示名稱。同一 CDN 位址對應多個名稱時不命名。"
+
+msgid "When router proxy traffic is attributed to a LAN device, keep the real application label in tooltip breakdowns instead of grouping it as \"Proxy-Stream (via Router)\". This only affects tooltip detail, not the device/application totals."
+msgstr "當路由器代理流量被歸屬到區域網裝置後，在懸浮提示明細中保留真實的應用名，而不是統一歸為“Proxy-Stream（經路由器）”。隻影響懸浮提示明細，不影響裝置/應用總量。"
+
+msgid "Where the history is saved and reloaded from after a reboot; no row = RAM only. Per location choose which resolutions are written: 5 min (24 hours view), hourly (Week / Month) and daily (Year, plus the link header calibration). Paths: /mnt/..., /media/..., /tmp/mnt/... (SD card, USB, network share) or /etc/ctstat-data (internal flash, created automatically). Flash tip: tick only \"daily\" there (about one write per day); 5 min / hourly are written once per write interval. All available locations are written (mirrors); a missing one is caught up when it is back. A location below a mount point (mounted or listed in fstab) is only used while that mount point is mounted. The router mounts nothing itself."
+msgstr "重啟後歷史的儲存與重新載入位置；沒有行 = 僅記憶體。每個位置可選擇寫入哪些解析度：5 分鐘（24 小時檢視）、每小時（周/月）和每日（年，以及鏈路層包頭校準）。路徑：/mnt/...、/media/...、/tmp/mnt/...（SD 卡、U 盤、網路共享）或 /etc/ctstat-data（內建快閃記憶體，自動建立）。快閃記憶體提示：那裡只勾選“每日”（約每天寫一次）；5 分鐘/每小時按寫入間隔各寫一次。所有可用位置都會寫入（鏡像）；某個位置恢復後會自動補齊。位於掛載點之下（已掛載或在 fstab 中）的位置只在該掛載點掛載期間使用。路由器本身不會執行掛載。"
+
+msgid "Write interval"
+msgstr "寫入間隔"
+
+msgid "Writing to %s failed - retrying%s."
+msgstr "寫入 %s 失敗 - 正在重試%s。"
+
+msgid "Written every %d min to every available target; the history stays in RAM meanwhile."
+msgstr "每 %d 分鐘寫入所有可用目標；期間歷史保留在記憶體中。"
+
+msgid "Year"
+msgstr "年"
+
+msgid "Year view. Default: 400 days."
+msgstr "年檢視。預設：400 天。"
+
+msgid "Yes"
+msgstr "是"
+
+msgid "Zeroes the whole conntrack mark when SQM starts. Turn it off if mwan3 (or anything else) keeps state in the higher mark bits."
+msgstr "SQM 啟動時把整個 conntrack 標記清零。如果 mwan3（或其他程式）在標記的高位儲存狀態，請關閉此項。"
+
+msgid "access timeout"
+msgstr "訪問逾時"
+
+msgid "active flows"
+msgstr "活動連線"
+
+msgid "all except the infrastructure ports below"
+msgstr "除下方基礎設施埠外的所有埠"
+
+msgid "attribution window"
+msgstr "歸屬視窗"
+
+msgid "backlog"
+msgstr "積壓"
+
+msgid "daily bucket count"
+msgstr "每日分桶數量"
+
+msgid "download shaper"
+msgstr "下載整形器"
+
+msgid "drops"
+msgstr "丟包"
+
+msgid "hourly bucket count"
+msgstr "每小時分桶數量"
+
+msgid "limit hits"
+msgstr "超限次數"
+
+msgid "memory growth limit"
+msgstr "記憶體增長上限"
+
+msgid "netifyd socket"
+msgstr "netifyd 套接字"
+
+msgid "no data (aggregator was not running)"
+msgstr "無資料（聚合程序未執行）"
+
+msgid "no traffic recorded"
+msgstr "未記錄到流量"
+
+msgid "not yet"
+msgstr "尚未"
+
+msgid "peak backlog %s"
+msgstr "積壓峰值 %s"
+
+msgid "poll interval"
+msgstr "輪詢間隔"
+
+msgid "rate averaging window"
+msgstr "速率平均視窗"
+
+msgid "router infrastructure ports"
+msgstr "路由器基礎設施埠"
+
+msgid "router proxy ports"
+msgstr "路由器代理埠"
+
+msgid "since %s"
+msgstr "自 %s 起"
+
+msgid "since start"
+msgstr "自啟動以來"
+
+msgid "total"
+msgstr "佔比"
+
+msgid "unknown error"
+msgstr "未知錯誤"
+
+msgid "upload shaper"
+msgstr "上傳整形器"
+
+msgid "via router services (proxy, DNS, LuCI ...) - LAN side, not WAN"
+msgstr "經由路由器服務（代理、DNS、LuCI ...）- 區域網側，非 WAN"
+
+msgid "write interval"
+msgstr "寫入間隔"
+
+msgid "⚠ No update for %ds (last successful read: %s) - retrying automatically..."
+msgstr "⚠ %d 秒未更新（上次成功讀取：%s）- 正在自動重試..."
+
+msgid "Charts"
+msgstr "圖表"
+
+msgid "Traffic Monitor"
+msgstr "流量監控"
+
+msgid "Adult content"
+msgstr "成人內容"
+
+msgid "Adult content — fallback; update database to load available groups"
+msgstr "成人內容 — 回退項；更新資料庫以載入可用分組"
+
+msgid "Advertising"
+msgstr "廣告"
+
+msgid "Advertising (all lists)"
+msgstr "廣告（全部列表）"
+
+msgid "AI chat (outside China)"
+msgstr "AI 對話（中國大陸以外）"
+
+msgid "Cryptocurrency"
+msgstr "加密貨幣"
+
+msgid "Games"
+msgstr "遊戲"
+
+msgid "Media"
+msgstr "影音媒體"
+
+msgid "Scholar"
+msgstr "學術"
+
+msgid "Social"
+msgstr "社交"
+
+msgid "Speed test"
+msgstr "測速"
+
+msgid "OK"
+msgstr "成功"
+
+msgid "Running…"
+msgstr "進行中…"
+
+msgid "Failed"
+msgstr "失敗"
+
+msgid "Not updated"
+msgstr "未更新"
+
+msgid "Update successful."
+msgstr "更新成功。"
+
+msgid "Update in progress…"
+msgstr "正在更新…"
+
+msgid "No update has completed yet."
+msgstr "尚未完成過更新。"
+
+msgid "Update was interrupted (service restart or error). Run it again."
+msgstr "更新被中斷（服務重啟或出錯），請重新執行。"
+
+msgid "Update aborted (rc=%s, e.g. service restart or error)"
+msgstr "更新中止（rc=%s，例如服務重啟或出錯）"
+
+msgid "No shaper found — using raw counters of %s (no configured rate)"
+msgstr "未找到整形器 — 使用 %s 的原始計數器（未配置速率）"
+
+msgid "Upload shaper found on %s; download uses raw counters unless a download device is detected"
+msgstr "在 %s 上找到上傳整形器；下載使用原始計數器，除非檢測到下載裝置"
+
+msgid "No shaper and no WAN device found — set option wan_dev in Traffic Monitor Settings"
+msgstr "未找到整形器和 WAN 裝置 — 請在流量圖表設定中配置 wan_dev"
+
+msgid "tc is not installed (tc-tiny / tc-full), using sysfs counters"
+msgstr "未安裝 tc（tc-tiny / tc-full），改用 sysfs 計數器"
+
+msgid "Traffic Monitor Settings"
+msgstr "流量監控設定"
+
+msgid "%s of %s Mbit/s configured"
+msgstr "%s / 已配置 %s Mbit/s"
+
+msgid "Total"
+msgstr "總計"
+
+msgid "packets"
+msgstr "個資料包"
+
+msgid "via"
+msgstr "經由"
+
+msgid "configured SQM bandwidth not found"
+msgstr "未找到已配置的 SQM 頻寬"
+
+msgid "The aggregator is not running — start it with /etc/init.d/ctstat start"
+msgstr "聚合服務未執行 — 請執行 /etc/init.d/ctstat start 啟動"
+
+msgid "The aggregator data file is empty — it is still starting up"
+msgstr "聚合資料檔案為空 — 服務仍在啟動中"
+
+msgid "Aggregator data is unreadable — restart it with /etc/init.d/ctstat restart"
+msgstr "聚合資料無法讀取 — 請執行 /etc/init.d/ctstat restart 重啟"
+
+msgid "Aggregator data is stale — restart it with /etc/init.d/ctstat restart"
+msgstr "聚合資料已過期 — 請執行 /etc/init.d/ctstat restart 重啟"
+
+msgid "Persistence is off: the history is kept in RAM only and is lost on reboot. Set a storage path under Services - Traffic Monitor - Settings."
+msgstr "持久化未啟用：歷史只儲存在記憶體中，重啟後丟失。請在「服務 → 流量監控 → 設定」中設定儲存路徑。"
+
+msgid "Download source"
+msgstr "下載來源"
+
+msgid "Automatic (official host, then mirrors)"
+msgstr "自動（先試官方位址，再試鏡像）"
+
+msgid "Custom URL"
+msgstr "自訂 URL"
+
+msgid "Custom download URL"
+msgstr "自訂下載位址"
+
+msgid "GitHub releases are not reachable from every network: the transfer can stall with zero bytes received. “Automatic” tries the official host first and then public mirrors; pick one mirror to stay on it, or enter your own URL."
+msgstr "GitHub release 在部分網路下無法訪問：傳輸可能連上後一直停在零位元組。選擇“自動”會先試官方位址，再依次嘗試公共鏡像；也可以固定使用某個鏡像，或填入自己的位址。"
+
+msgid "Directory that holds dlc.dat_plain.yml and dlc.dat_plain.yml.sha256sum. A trailing slash is optional. Plain HTTP is allowed for a local mirror."
+msgstr "存放 dlc.dat_plain.yml 與 dlc.dat_plain.yml.sha256sum 的目錄位址。結尾斜槓可省略；本地鏡像允許使用明文 HTTP。"
+
+msgid "Download failed: %s (%s)"
+msgstr "下載失敗：%s（%s）"
+
+msgid "DNS lookup or connection failed"
+msgstr "網域解析或網路連線失敗"
+
+msgid "connection timed out"
+msgstr "連線逾時"
+
+msgid "TLS handshake or certificate failed"
+msgstr "TLS 握手或憑證驗證失敗"
+
+msgid "file not found (404)"
+msgstr "檔案不存在（404）"
+
+msgid "connection refused"
+msgstr "連線被拒絕"
+
+msgid "download error"
+msgstr "下載出錯"
+
+msgid "no response"
+msgstr "無回應"
+
+msgid "Checksum mismatch — the downloaded list was rejected and the previous one kept."
+msgstr "驗證值不匹配 — 下載的列表已被拒絕，繼續使用原列表。"
+
+msgid "The downloaded list contains no category groups — it was rejected."
+msgstr "下載的列表不含任何分組 — 已拒絕使用。"
+
+msgid "The downloaded list could not be parsed — the previous one was kept."
+msgstr "下載的列表無法解析 — 繼續使用原列表。"

@@ -1,0 +1,401 @@
+name: Build OpenWrt Packages
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+env:
+  PACKAGE_NAME: luci-app-wechatpush-pro
+  SDK_DIR: /home/runner/work/openwrt-sdk
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build APK (v25.12)
+    runs-on: ubuntu-latest
+    env:
+      OPENWRT_VERSION: 'v25.12.0-rc1'
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: all
+            path: x86/64
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential rsync unzip zstd python3-pyelftools
+
+      - name: Cache OpenWrt SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SDK_DIR }}
+          key: ${{ runner.os }}-sdk-apk-${{ matrix.target.name }}-${{ env.OPENWRT_VERSION }}
+
+      - name: Download, extract OpenWrt SDK and update feeds
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          release_version="${OPENWRT_VERSION#v}"
+          sdk_url_prefix="https://downloads.openwrt.org/releases/${release_version}/targets/${{ matrix.target.path }}"
+          
+          sdk_filename=$(curl -s "$sdk_url_prefix/" | \
+                        grep -o '<a href="openwrt-sdk-.*-x86_64\.tar\.\(xz\|zst\)">' | \
+                        sed -e 's/.*<a href="//' -e 's/">//' | \
+                        head -n 1)
+
+          if [ -z "$sdk_filename" ]; then
+            echo "::error::Could not find SDK file at ${sdk_url_prefix}/"
+            echo "Available files:"
+            curl -s "$sdk_url_prefix/" | grep -o '<a href="[^"]*">[^<]*</a>' | sed -e 's/<a href="\(.*\)".*>\(.*\)/\1\t\2/'
+            exit 1
+          fi
+          
+          echo "Downloading SDK: ${sdk_url_prefix}/${sdk_filename}"
+          wget -q "${sdk_url_prefix}/${sdk_filename}"
+          
+          echo "Extracting SDK..."
+          tar -xf "$sdk_filename"
+          mv $(find . -maxdepth 1 -type d -name 'openwrt-sdk-*') ${{ env.SDK_DIR }}
+
+          echo "Updating feeds..."
+          cd ${{ env.SDK_DIR }}
+          
+          echo "Original feeds configuration:"
+          cat feeds.conf.default
+          
+          max_retries=5
+          retry_count=0
+          while [ $retry_count -lt $max_retries ]; do
+            echo "Attempt $((retry_count + 1)) of $max_retries to update feeds..."
+            
+            echo "Replacing feeds URLs with GitHub mirrors..."
+            sed -i 's|https://git.openwrt.org/openwrt/openwrt.git|https://github.com/openwrt/openwrt.git|g' feeds.conf.default
+            sed -i 's|https://git.openwrt.org/feed/packages.git|https://github.com/openwrt/packages.git|g' feeds.conf.default
+            sed -i 's|https://git.openwrt.org/project/luci.git|https://github.com/openwrt/luci.git|g' feeds.conf.default
+            sed -i 's|https://git.openwrt.org/feed/routing.git|https://github.com/openwrt/routing.git|g' feeds.conf.default
+            sed -i 's|https://git.openwrt.org/feed/telephony.git|https://github.com/openwrt/telephony.git|g' feeds.conf.default
+            
+            if [ $retry_count -eq 0 ]; then
+              echo "Updated feeds configuration:"
+              cat feeds.conf.default
+            fi
+            
+            if ./scripts/feeds update -a; then
+              echo "Feeds update successful"
+              break
+            else
+              retry_count=$((retry_count + 1))
+              if [ $retry_count -lt $max_retries ]; then
+                wait_time=$((60 * retry_count))
+                echo "Feeds update failed, waiting ${wait_time} seconds before retry..."
+                sleep $wait_time
+              else
+                echo "::error::Feeds update failed after $max_retries attempts"
+                exit 1
+              fi
+            fi
+          done
+          
+          ./scripts/feeds install -a
+          cd ..
+
+      - name: Prepare build environment
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          rm -rf package/${PACKAGE_NAME}
+          src_dir="${{ github.workspace }}"
+          if [ -f "$src_dir/Makefile" ]; then
+            pkg_src="$src_dir"
+          else
+            pkg_src=$(find "$src_dir" -maxdepth 1 -type d -name "${PACKAGE_NAME}" -o -name "luci-app-*${PACKAGE_NAME#luci-app-}*" | head -n 1)
+            if [ -z "$pkg_src" ]; then
+              echo "::error::Could not locate package directory for ${PACKAGE_NAME}"
+              exit 1
+            fi
+          fi
+          mkdir -p ./package/${PACKAGE_NAME}
+          rsync -a --delete "$pkg_src"/ ./package/${PACKAGE_NAME}/
+          
+          # 注意：wrtbwmon 在 OpenWrt 22+ (firewall4/nftables) 环境下不兼容
+          # 流量统计功能在新版本中不可用，但保留其他功能
+          
+          translation_pkg=${PACKAGE_NAME#luci-app-}
+          mkdir -p ./bin/packages
+          find ./bin/packages -type f -name "${PACKAGE_NAME}*.apk" -delete
+          find ./bin/packages -type f -name "luci-i18n-${translation_pkg}-*.apk" -delete
+          {
+            echo "CONFIG_PACKAGE_${PACKAGE_NAME}=m"
+            # 本包是 noarch（纯 shell + JS + JSON），编译自身不需要任何 C 依赖。
+            # Enable_* 选项只是"安装时让 opkg 拉哪些可选依赖"的 Kconfig 标记，
+            # 在 CI 里打开会把 lsblk / smartmontools / openssh 的整条依赖树
+            # 拉进来预编（含 host libunistring，在 runner 的 GCC 15 下编不过），
+            # 而 Release 也不需要这些包——用户装插件时由 opkg 从源里解析即可。
+            # 故这里保持 =n，只编主程序与翻译包。
+            echo "CONFIG_PACKAGE_${PACKAGE_NAME}_Enable_Traffic_Monitoring=n"
+            echo "CONFIG_PACKAGE_${PACKAGE_NAME}_Enable_Local_Disk_Information_Detection=n"
+            echo "CONFIG_PACKAGE_${PACKAGE_NAME}_Enable_Host_Information_Detection=n"
+            echo "CONFIG_PACKAGE_luci-i18n-${translation_pkg}-zh-cn=m"
+            echo "CONFIG_PACKAGE_luci-i18n-${translation_pkg}-zh-tw=m"
+            echo "CONFIG_LUCI_LANG_zh_Hans=y"
+            echo "CONFIG_LUCI_LANG_zh_Hant=y"
+          } > .config
+          make defconfig
+
+      - name: Compile the package
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          make package/${PACKAGE_NAME}/compile V=s -j$(($(nproc) + 1))
+
+      - name: Find and prepare .apk file
+        id: find_apk
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          translation_pkg=${PACKAGE_NAME#luci-app-}
+          rm -rf upload
+          mkdir -p upload
+          find ./bin/packages -type f \( -name "${PACKAGE_NAME}*.apk" -o -name "luci-i18n-${translation_pkg}-*.apk" -o -name "lsblk*.apk" -o -name "smartmontools*.apk" -o -name "openssh-client*.apk" -o -name "openssh-keygen*.apk" \) | while read -r apk; do
+            rel_path=${apk#./}
+            echo "Found apk: $rel_path"
+            cp "$apk" upload/
+          done
+          if ! find upload -maxdepth 1 -type f -name '*.apk' | grep -q '.'; then
+            echo "::error::No apk files found in ./bin/packages/"
+            echo "Directory tree of ./bin/:"
+            ls -R ./bin/
+            exit 1
+          fi
+          echo "path=upload" >> $GITHUB_OUTPUT
+
+      - name: Upload .apk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-apk-${{ matrix.target.name }}
+          path: ${{ env.SDK_DIR }}/${{ steps.find_apk.outputs.path }}
+          if-no-files-found: error
+
+  build-ipk:
+    name: Build IPK (v24.10)
+    # 用 22.04：GCC 11 默认 -std=gnu17，而 24.10 的 luci-base/contrib/lemon.c
+    # 用 K&R 风格 void f() 声明，在 ubuntu-latest(GCC 15, 默认 C23) 下会编译失败。
+    runs-on: ubuntu-22.04
+    # 24.10 SDK 在 GH runner 上编译依赖树耗时极长且易被中断；
+    # 主产物 apk 由 build-apk 负责，ipk 失败不应让整条流水线变红。
+    continue-on-error: true
+    env:
+      OPENWRT_VERSION: 'v24.10.0'
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: all
+            path: x86/64
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential rsync unzip zstd coreutils
+
+      - name: Cache OpenWrt SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SDK_DIR }}
+          key: ubuntu-22.04-sdk-ipk-${{ matrix.target.name }}-${{ env.OPENWRT_VERSION }}
+
+      - name: Download, extract OpenWrt SDK and update feeds
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          release_version="${OPENWRT_VERSION#v}"
+          sdk_url_prefix="https://downloads.openwrt.org/releases/${release_version}/targets/${{ matrix.target.path }}"
+          
+          sdk_filename=$(curl -s "$sdk_url_prefix/" | \
+                        grep -o '<a href="openwrt-sdk-.*-x86_64\.tar\.\(xz\|zst\)">' | \
+                        sed -e 's/.*<a href="//' -e 's/">//' | \
+                        head -n 1)
+
+          if [ -z "$sdk_filename" ]; then
+            echo "::error::Could not find SDK file at ${sdk_url_prefix}/"
+            echo "Available files:"
+            curl -s "$sdk_url_prefix/" | grep -o '<a href="[^"]*">[^<]*</a>' | sed -e 's/<a href="\(.*\)".*>\(.*\)/\1\t\2/'
+            exit 1
+          fi
+          
+          echo "Downloading SDK: ${sdk_url_prefix}/${sdk_filename}"
+          wget -q "${sdk_url_prefix}/${sdk_filename}"
+          
+          echo "Extracting SDK..."
+          tar -xf "$sdk_filename"
+          mv $(find . -maxdepth 1 -type d -name 'openwrt-sdk-*') ${{ env.SDK_DIR }}
+
+          echo "Updating feeds..."
+          cd ${{ env.SDK_DIR }}
+          mkdir -p staging_dir/host
+          touch staging_dir/host/.prereq-build
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          cd ..
+
+      - name: Prepare build environment
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          rm -rf package/${PACKAGE_NAME}
+          src_dir="${{ github.workspace }}"
+          if [ -f "$src_dir/Makefile" ]; then
+            pkg_src="$src_dir"
+          else
+            pkg_src=$(find "$src_dir" -maxdepth 1 -type d -name "${PACKAGE_NAME}" -o -name "luci-app-*${PACKAGE_NAME#luci-app-}*" | head -n 1)
+            if [ -z "$pkg_src" ]; then
+              echo "::error::Could not locate package directory for ${PACKAGE_NAME}"
+              exit 1
+            fi
+          fi
+          mkdir -p ./package/${PACKAGE_NAME}
+          rsync -a --delete "$pkg_src"/ ./package/${PACKAGE_NAME}/
+          translation_pkg=${PACKAGE_NAME#luci-app-}
+          mkdir -p ./bin/packages
+          find ./bin/packages -type f -name "${PACKAGE_NAME}*.ipk" -delete
+          find ./bin/packages -type f -name "luci-i18n-${translation_pkg}-*.ipk" -delete
+          {
+            echo "CONFIG_PACKAGE_${PACKAGE_NAME}=m"
+            echo "CONFIG_PACKAGE_luci-i18n-${translation_pkg}-zh-cn=m"
+            echo "CONFIG_PACKAGE_luci-i18n-${translation_pkg}-zh-tw=m"
+            echo "CONFIG_LUCI_LANG_zh_Hans=y"
+            echo "CONFIG_LUCI_LANG_zh_Hant=y"
+          } > .config
+          make defconfig
+
+      - name: Compile the package
+        id: compile
+        continue-on-error: true
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          # 1) SDK 的 staging_dir/host/bin 缺少 host 编译器，补上
+          mkdir -p staging_dir/host/bin
+          REAL_CC="$(command -v gcc || command -v cc)"
+          REAL_CXX="$(command -v g++ || command -v c++)"
+          echo "REAL_CC=$REAL_CC ($($REAL_CC --version | head -1))"
+
+          # 2) runner 的系统 GCC 15 默认 C23，24.10 的 luci-base/contrib/lemon.c
+          #    用 K&R 风格 void f() 声明会报 conflicting types；
+          #    且 lemon 的编译命令硬编码为 `cc`，不读 $(CC)，只能从 PATH 层面拦截。
+          rm -f staging_dir/host/bin/gcc staging_dir/host/bin/g++
+          printf '#!/bin/sh\nexec %s -std=gnu17 "$@"\n' "$REAL_CC"  > staging_dir/host/bin/gcc
+          printf '#!/bin/sh\nexec %s -std=gnu17 "$@"\n' "$REAL_CXX" > staging_dir/host/bin/g++
+          chmod +x staging_dir/host/bin/gcc staging_dir/host/bin/g++
+          mkdir -p /tmp/ccwrap
+          printf '#!/bin/sh\nexec %s -std=gnu17 "$@"\n' "$REAL_CC" > /tmp/ccwrap/cc
+          chmod +x /tmp/ccwrap/cc
+          export PATH="/tmp/ccwrap:$PATH"
+          echo "cc -> $(command -v cc)"; cc --version | head -1
+          staging_dir/host/bin/gcc --version | head -1
+
+          # 3) SDK 的 staging_dir/host/bin/python3 是指向 /usr/bin/python3.12 的绝对软链
+          #    （官方 24.10 SDK 在 Ubuntu 24.04 上打包）。本 job 跑在 ubuntu-22.04
+          #    （为了 GCC 11 的 gnu17 默认值），该路径不存在，meson 启动失败：
+          #      bash: .../staging_dir/host/bin/python3: No such file or directory
+          #      make[2]: *** [.../.configured_...] Error 127
+          #    依赖包 iputils 因此编不过，ipk 从来没能真正产出（一直被 continue-on-error 掩盖）。
+          if [ ! -x staging_dir/host/bin/python3 ]; then
+            ln -sf "$(command -v python3)" staging_dir/host/bin/python3
+            ln -sf "$(command -v python3)" staging_dir/host/bin/python
+            echo "python3 -> $(command -v python3)"
+          fi
+
+          set -o pipefail
+          make package/${PACKAGE_NAME}/compile V=s -j$(($(nproc) + 1)) 2>&1 | tee /tmp/compile.log
+
+      - name: Publish diagnostics on failure
+        if: steps.compile.outcome == 'failure'
+        run: |
+          set +e
+          WORK="${{ github.workspace }}"
+          mkdir -p "$WORK/diag"
+          cp /tmp/compile.log "$WORK/diag/compile.log" 2>/dev/null
+          cd "${{ env.SDK_DIR }}"
+          {
+            echo "===== .config 相关项 ====="
+            grep -nE "wechatpush-pro|lua-runtime|LUCI_LANG|CONFIG_TARGET" .config 2>/dev/null
+            echo
+            echo "===== logs 目录文件 ====="
+            find logs -type f 2>/dev/null | head -60
+            echo
+            echo "===== package 目录 ====="
+            ls -la package/${PACKAGE_NAME} 2>/dev/null | head -25
+            echo
+            echo "===== 关键错误行 ====="
+            grep -rnE "error:|Error [0-9]|No rule to make target|does not exist|undefined reference|fatal error|WARNING: Makefile|Command not found|not found" logs 2>/dev/null | head -120
+          } > "$WORK/diag/summary.txt" 2>&1
+          cd "$WORK"
+          git config user.email "ci-diag@local"
+          git config user.name "ci-diag"
+          git checkout -B diag-ipk
+          git add -Af diag
+          git commit -qm "diag: ipk compile failure (run ${{ github.run_number }})" || echo "nothing to commit"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/diag-ipk"
+
+      - name: Fail if compile failed
+        if: steps.compile.outcome == 'failure'
+        run: exit 1
+
+      - name: Find and prepare .ipk file
+        id: find_ipk
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          translation_pkg=${PACKAGE_NAME#luci-app-}
+          rm -rf upload
+          mkdir -p upload
+          find ./bin/packages -type f \( -name "${PACKAGE_NAME}*.ipk" -o -name "luci-i18n-${translation_pkg}-*.ipk" \) | while read -r ipk; do
+            rel_path=${ipk#./}
+            echo "Found IPK: $rel_path"
+            cp "$ipk" upload/
+          done
+          if ! find upload -maxdepth 1 -type f -name '*.ipk' | grep -q '.'; then
+            echo "::error::No IPK files found in ./bin/packages/"
+            echo "Directory tree of ./bin/:"
+            ls -R ./bin/
+            exit 1
+          fi
+          echo "path=upload" >> $GITHUB_OUTPUT
+
+      - name: Upload .ipk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}-ipk-${{ matrix.target.name }}
+          path: ${{ env.SDK_DIR }}/${{ steps.find_ipk.outputs.path }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: [build-apk, build-ipk]
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: release-assets/**/*

@@ -1,0 +1,10 @@
+# 统一换行符：仓库内文本文件一律 LF，避免编辑器保存为 CRLF 后
+# 导致 shell 脚本（shebang/`{` 后带 \r）在路由器上直接语法错误。
+* text=auto eol=lf
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ipk binary
+*.apk binary

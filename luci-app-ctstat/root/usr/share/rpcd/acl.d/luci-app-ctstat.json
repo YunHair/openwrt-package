@@ -1,0 +1,52 @@
+{
+  "luci-app-ctstat": {
+    "description": "Read access to the ctstat rpcd plugin and settings",
+    "read": {
+      "ubus": {
+        "luci.ctstat": [
+          "get_stats",
+          "get_domain_status",
+          "get_domain_groups"
+        ]
+      },
+      "uci": [
+        "ctstat"
+      ]
+    },
+    "write": {
+      "ubus": {
+        "luci.ctstat": []
+      }
+    }
+  },
+  "luci-app-ctstat-admin": {
+    "description": "Administrative access to the ctstat settings and actions",
+    "read": {
+      "ubus": {
+        "luci.ctstat": [
+          "get_stats",
+          "get_domain_status",
+          "get_domain_groups",
+          "restart",
+          "reset_history",
+          "update_domains"
+        ]
+      },
+      "uci": [
+        "ctstat"
+      ]
+    },
+    "write": {
+      "ubus": {
+        "luci.ctstat": [
+          "restart",
+          "reset_history",
+          "update_domains"
+        ]
+      },
+      "uci": [
+        "ctstat"
+      ]
+    }
+  }
+}

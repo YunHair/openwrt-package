@@ -1,0 +1,40 @@
+{
+    "admin/services/ctstat": {
+        "title": "Traffic Monitor",
+        "order": 60,
+        "action": {
+            "type": "firstchild"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-ctstat"
+            ]
+        }
+    },
+    "admin/services/ctstat/chart": {
+        "title": "Charts",
+        "order": 10,
+        "action": {
+            "type": "view",
+            "path": "ctstat/chart"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-ctstat"
+            ]
+        }
+    },
+    "admin/services/ctstat/settings": {
+        "title": "Settings",
+        "order": 20,
+        "action": {
+            "type": "view",
+            "path": "ctstat/settings"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-ctstat-admin"
+            ]
+        }
+    }
+}
