@@ -1,7 +1,0 @@
-config ctstat 'config'
-	option enabled '1'
-	option interval '3'
-	# LAN 网段，留空自动探测（br-* 接口 / uci network.lan）
-	option lan_prefix ''
-	# 页面刷新间隔（秒）
-	option refresh '5'
