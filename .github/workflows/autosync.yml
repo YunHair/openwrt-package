@@ -86,7 +86,6 @@ jobs:
           "https://github.com/whzhni1/luci-app-lucky|main|dirs|luci-app-lucky|"
           "https://github.com/whzhni1/luci-app-tailscale|main|dirs|luci-app-tailscale|"
           "https://github.com/Yunhair/luci-app-gately-plus|main|dirs|luci-app-gately-plus|" 
-          "https://github.com/Yunhair/luci-app-ctstat|main|dirs|luci-app-ctstat|"
           
 
           
@@ -99,6 +98,7 @@ jobs:
           "https://github.com/zzsj0928/luci-app-pushbot|master|full| |luci-app-pushbot"
           "https://github.comrabbitrogi/luci-app-zerotier|main|full| |luci-app-zerotier"
           "https://github.com/YunHair/luci-app-wechatpush-pro|main|full| |luci-app-wechatpush-pro"
+          "https://github.com/YunHair/luci-app-ctstat|main|full| |luci-app-ctstat"
           
 
 
