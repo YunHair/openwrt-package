@@ -1232,6 +1232,43 @@ msgstr "连接点"
 msgid "Online time"
 msgstr "在线时间"
 
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "Hostname"
+msgstr "主机名"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "IPv4 address"
+msgstr "IPv4 地址"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "MAC address"
+msgstr "MAC 地址"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "Interfaces"
+msgstr "接口"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "Download"
+msgstr "下载"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "Upload"
+msgstr "上传"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "Total traffic"
+msgstr "总流量"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "Details"
+msgstr "详情"
+
+#: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/client.js:126
+msgid "Swipe the table horizontally to see more columns"
+msgstr "左右滑动表格可查看更多列"
+
+
 #: applications/luci-app-wechatpush-pro/htdocs/luci-static/resources/view/wechatpush-pro/log.js:75
 msgid "Clear Logs..."
 msgstr "清除日志..."

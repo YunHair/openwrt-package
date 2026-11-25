@@ -106,7 +106,9 @@ return view.extend({
 					if (traffic) {
 						device.traffic_in = traffic.in;
 						device.traffic_out = traffic.out;
-						device.traffic_total = traffic.total;
+						// 总流量 = 下载 + 上传。usage.db 的 total 列本身也是 in+out，
+						// 这里前端再算一次，避免旧数据里 total 缺失或被截断时显示成 0。
+						device.traffic_total = (traffic.in || 0) + (traffic.out || 0);
 					}
 				});
 				return { devices: data.devices };
@@ -123,8 +125,8 @@ return view.extend({
 		}
 		var devices = data.devices.filter(device => device.status === 'online' || device.status === 'unknown');
 		var totalDevices = devices.length;
-		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Interfaces'), _('Connection Point'), _('Online time'), _('Download'), _('Upload'), _('Details')];
-		var columns = ['name', 'ip', 'mac', 'interface', 'parent', 'uptime', 'traffic_in', 'traffic_out', 'usage'];
+		var headers = [_('Hostname'), _('IPv4 address'), _('MAC address'), _('Interfaces'), _('Connection Point'), _('Online time'), _('Download'), _('Upload'), _('Total traffic'), _('Details')];
+		var columns = ['name', 'ip', 'mac', 'interface', 'parent', 'uptime', 'traffic_in', 'traffic_out', 'traffic_total', 'usage'];
 		var visibleColumns = [];
 		var hasData = false;
 
@@ -178,14 +180,22 @@ return view.extend({
 		}
 
 		var style = `
+			/* 横向滚动容器：列比屏幕宽时可以左右拖动，而不是被父容器裁掉 */
+			.device-table-wrap {
+				width: 100%;
+				max-width: 100%;
+				margin-top: 10px;
+				overflow-x: auto;
+				-webkit-overflow-scrolling: touch;
+				border-radius: 8px;
+				box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+			}
+
 			/* 设备表格样式 */
 			.device-table {
-				width: 80%; /* 表格宽度占满父容器 */
+				width: 100%; /* 表格宽度占满父容器 */
+				min-width: 760px; /* 列多时保持可读，由外层横向滚动 */
 				border-collapse: collapse; /* 合并边框 */
-				margin-top: 10px; /* 顶部外边距 */
-				box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* 阴影效果 */
-				border-radius: 8px; /* 圆角边框 */
-				overflow: hidden; /* 内容溢出隐藏 */
 			}
 
 			.device-table th,
@@ -242,6 +252,15 @@ return view.extend({
 				padding-left: 20px; /* 第一列左侧内边距 */
 			}
 
+			.device-table .dev-name {
+				display: inline-block;
+				max-width: 100%;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				vertical-align: bottom;
+			}
+
 			.device-table td a {
 				color: #007bff; /* 链接颜色 */
 				text-decoration: none; /* 去掉下划线 */
@@ -255,16 +274,48 @@ return view.extend({
 				display: none; /* 隐藏元素 */
 			}
 
+			.device-table-hint {
+				display: none; /* 仅手机端提示可横向滑动 */
+			}
+
 			@media (max-width: 767px) {
+				.device-table-wrap {
+					scrollbar-width: thin;
+				}
+				.device-table-hint {
+					display: block;
+					margin: 6px 0 0;
+					font-size: 12px;
+					opacity: 0.65;
+					text-align: center;
+				}
+				/* 横向滑动时把设备名固定在左侧，滚到右边也知道是哪台设备 */
+				.device-table th:first-child,
+				.device-table td:first-child {
+					position: sticky;
+					left: 0;
+					z-index: 1;
+					background-color: var(--background-color-medium, #fff);
+					/* border-collapse 下粘性单元格的边框不跟随，用阴影补一条分界线 */
+					box-shadow: 1px 0 0 0 #ddd;
+				}
+				.device-table tbody tr:nth-child(even) td:first-child {
+					background-color: var(--background-color-low, #f2f2f2);
+				}
 				.device-table {
 					width: 100%; /* 表格宽度占满父容器 */
-					overflow: hidden; /* 内容溢出隐藏 */
+					min-width: 620px; /* 手机上一屏放不下，交给外层横向滚动 */
 				}
 				.device-table th,
 				.device-table td {
-					padding: 3px; /* 单元格内边距 */
+					padding: 4px 3px; /* 单元格内边距 */
+					font-size: 12px; /* 缩小字号，减少横向占用 */
 					text-align: center; /* 文本居中 */
 					border: 0.35px solid #ddd; /* 边框样式 */
+					white-space: nowrap; /* 单元格不换行，行高一致 */
+				}
+				.device-table th {
+					padding-right: 14px; /* 给排序箭头留位置 */
 				}
 				.device-table td:first-child {
 					max-width: 80px;
@@ -275,25 +326,27 @@ return view.extend({
 					overflow: hidden; /* 隐藏溢出内容 */
 					text-overflow: ellipsis; /* 显示省略号 */
 				}
-				/* 隐藏特定列 */
+				.device-table .dev-name {
+					max-width: 68px; /* 固定设备名列宽度，横向滑动时左侧不占太多 */
+					margin-right: 4px;
+				}
+				/* 隐藏特定列：只隐藏连接点，下载/上传/总流量都要能看到 */
 				.device-table th[data-column="parent"],
-				.device-table td[data-column="parent"],
-				.device-table th[data-column="traffic_out"],
-				.device-table td[data-column="traffic_out"] {
+				.device-table td[data-column="parent"] {
 					display: none;
 				}
-				/* 隐藏接口列的文本部分 */
-				.device-table td[data-column="interface"] span:not(.iface-icon) {
-					display: none;
-				}
-				/* 调整图标样式 */
-				.device-table td[data-column="interface"] .iface-icon {
-					margin-right: 0; /* 去掉图标右侧的间距 */
+				/* 接口列只输出文字（2.4G / 5G / LAN），不再放 emoji 图标，
+				   窄屏也不隐藏，避免字体缺字或缺图标时整格空白 */
+				.device-table td[data-column="interface"] {
+					white-space: nowrap;
 				}
 			}
 		`;
 
 		function createTable() {
+			var wrap = document.createElement('div');
+			wrap.className = 'device-table-wrap';
+
 			var table = document.createElement('table');
 			table.classList.add('device-table');
 
@@ -335,27 +388,27 @@ return view.extend({
 							link.textContent = device['ip'];
 							link.target = '_blank';
 							cell.appendChild(link);
+						} else if (columns[i] === 'name') {
+							// 用 span 包裹，窄屏下才能稳定地省略号截断（td 上的 max-width 不生效）
+							var nameSpan = document.createElement('span');
+							nameSpan.className = 'dev-name';
+							nameSpan.textContent = device['name'] || '';
+							cell.appendChild(nameSpan);
 						} else if (columns[i] === 'interface') {
-							var icon = document.createElement('span');
-							icon.classList.add('iface-icon');
-							if (device['interface'] === '2.4G') {
-								icon.innerHTML = '📶';
-							} else if (device['interface'] === '5G') {
-								icon.innerHTML = '🛜';
-							} else if (device['interface'] === 'WiFi') {
-								icon.innerHTML = '🛜';
-							}
-
-							var text = document.createElement('span');
-							text.textContent = device['interface'];
-
-							cell.appendChild(icon);
-							cell.appendChild(text);
-						} else if (columns[i] === 'traffic_in' || columns[i] === 'traffic_out') {
+							// 只输出文字，不用 emoji 图标。原来的图标有两处隐患：
+							// 1) 有线设备（LAN）拿不到图标，窄屏又把文字隐藏了，整格变成空白；
+							// 2) 🛜 是 Unicode 15 才有的字符，旧安卓/精简字体缺字会显示豆腐块。
+							// 文字本身（2.4G / 5G / LAN）已经能说明问题，不再依赖字体。
+							cell.textContent = device['interface'];
+						} else if (columns[i] === 'traffic_in' || columns[i] === 'traffic_out' || columns[i] === 'traffic_total') {
 							var trafficBytes = parseInt(device[columns[i]], 10) || 0;
 							cell.textContent = formatTraffic(trafficBytes);
-							if (trafficBytes > 0)
-								cell.title = trafficBytes + ' B';
+							if (trafficBytes > 0) {
+								if (columns[i] === 'traffic_total')
+									cell.title = (parseInt(device.traffic_in, 10) || 0) + ' B + ' + (parseInt(device.traffic_out, 10) || 0) + ' B';
+								else
+									cell.title = trafficBytes + ' B';
+							}
 						} else if (columns[i] === 'parent') {
 							if (device['parent']) {
 								var parentDevice = devices.find(d => {
@@ -383,7 +436,8 @@ return view.extend({
 
 			table.appendChild(tbody);
 
-			return table;
+			wrap.appendChild(table);
+			return wrap;
 		}
 
 		function calculateUptime(uptime, simpleFormat = false) {
@@ -473,7 +527,7 @@ return view.extend({
 				return ipToNumber(device['ip']);
 			} else if (column === 'interface') {
 				return interfaceDisplayMap[device['interface']] || 'LAN';
-			} else if (column === 'traffic_in' || column === 'traffic_out') {
+			} else if (column === 'traffic_in' || column === 'traffic_out' || column === 'traffic_total') {
 				return parseInt(device[column], 10) || 0;
 			} else if (column === 'parent') {
 				// 使用 parent 列的实际显示值进行排序
@@ -535,10 +589,26 @@ return view.extend({
 		});
 
 		function refreshContainer() {
+			// 自动刷新会整表重建，先记住横向滚动位置，重建后还原，
+			// 否则手机端拖到右边看总流量，5 秒后又被弹回最左边。
+			var prevWrap = container.querySelector('.device-table-wrap');
+			var prevScrollLeft = prevWrap ? prevWrap.scrollLeft : 0;
+
 			container.innerHTML = '';
 			container.appendChild(document.createElement('h2')).textContent = _('Currently %s devices online').replace('%s', totalDevices);
-			container.appendChild(createTable());
+
+			var wrap = createTable();
+			container.appendChild(wrap);
+
+			var hint = document.createElement('div');
+			hint.className = 'device-table-hint';
+			hint.textContent = _('Swipe the table horizontally to see more columns');
+			container.appendChild(hint);
+
 			container.appendChild(document.createElement('style')).textContent = style;
+
+			if (prevScrollLeft > 0)
+				wrap.scrollLeft = prevScrollLeft;
 		}
 
 		function sortTable(column, direction) {
@@ -572,8 +642,17 @@ return view.extend({
 			console.error('Table container not found.');
 			return;
 		}
+		// 自动刷新会整体换掉内容，这里接住横向滚动位置，否则手机上每 5 秒跳回最左
+		var prevWrap = existingContainer.querySelector('.device-table-wrap');
+		var prevScrollLeft = prevWrap ? prevWrap.scrollLeft : 0;
+
 		existingContainer.innerHTML = '';
 		existingContainer.appendChild(newContent);
+
+		if (prevScrollLeft > 0) {
+			var wrap = newContent.querySelector('.device-table-wrap');
+			if (wrap) wrap.scrollLeft = prevScrollLeft;
+		}
 	},
 
 	handleSave: null,

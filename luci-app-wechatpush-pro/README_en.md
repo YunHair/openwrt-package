@@ -86,7 +86,7 @@ Calls `luci.ctstat.get_stats` over ubus and reads cumulative per-client download
 
 - Requires `luci-app-ctstat` to be installed and running.
 - Works on conntrack / nftables, creates no iptables rules and coexists with firewall4.
-- The online clients table shows **total download** and **total upload** per client. In the scheduled client list, **Total Traffic** is the sum of download and upload for that client.
+- The online clients table shows **total download**, **total upload** and **total traffic** (download + upload) per client. In the scheduled client list, **Total Traffic** is likewise the sum of the two.
 - Counters are cumulative since the ctstat daemon started; they restart when ctstat is restarted or reset.
 - Clients without a known MAC are keyed by IP in ctstat. The plugin matches by both MAC and IP so the traffic columns are not lost.
 

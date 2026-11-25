@@ -86,7 +86,7 @@ opkg remove luci-app-wechatpush-oaf luci-i18n-wechatpush-oaf-zh-cn luci-i18n-wec
 
 - 需要安装并运行 `luci-app-ctstat`。
 - 工作在 conntrack / nftables 上，不创建 iptables 规则，可与 firewall4 共存。
-- 在线设备页表格按客户端显示“总下载”和“总上传”；定时推送的设备列表中“总流量”为该设备的下载 + 上传之和。
+- 在线设备页表格按客户端显示“总下载”“总上传”和“总流量”（下载 + 上传）；定时推送的设备列表中“总流量”同样是两者之和。
 - 数据为 ctstat 启动以来的累计值；ctstat 重启或执行 reset 后会重新计数。
 - ctstat 将无 MAC 的客户端以 IP 作为键，插件同时按 MAC / IP 匹配，避免设备页丢失流量列。
 
